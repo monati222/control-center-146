@@ -229,6 +229,7 @@
             </div>
 
             <div id="teacher-status-banner" class="hidden mb-4 p-4 rounded-xl border text-center txt-body"></div>
+            <div class="text-center text-ccTextMuted text-xs mb-3">التحديث يدوي — اضغطي زر «تحديث النتائج» عندما تريدين جلب أحدث الدرجات.</div>
 
             <div class="glass-card flex-grow custom-scroll p-0 overflow-hidden">
                 <table class="w-full text-right border-collapse">
@@ -1004,12 +1005,18 @@ function escapeHtml(value) {
 
         async function showTeacherDashboard() {
             goToScreen('screen-teacher');
-            if(BACKEND_URL) {
-                try { await loadActiveSessionFromBackend(); } catch(e) { console.warn("تعذر جلب الجلسة الحالية", e); }
+            if(window.teacherInterval) {
+                clearInterval(window.teacherInterval);
+                window.teacherInterval = null;
             }
-            await refreshTeacherLeaderboard();
-            if(window.teacherInterval) clearInterval(window.teacherInterval);
-            window.teacherInterval = setInterval(refreshTeacherLeaderboard, 7000);
+
+            const tbody = document.getElementById('teacher-leaderboard-body');
+            const banner = document.getElementById('teacher-status-banner');
+
+            if(tbody) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-ccTextMuted font-bold">اضغطي «تحديث النتائج» لعرض أحدث النتائج.</td></tr>`;
+            }
+            if(banner) banner.classList.add('hidden');
         }
 
         async function startNewTeacherSession() {
@@ -1018,9 +1025,7 @@ function escapeHtml(value) {
                 return;
             }
 
-            const ok = confirm("بدء جلسة جديدة؟
-
-سيتم حذف نتائج الجلسة السابقة وبدء الحصة من الصفر لجميع المجموعات.");
+            const ok = confirm("بدء جلسة جديدة؟\n\nسيتم حذف نتائج الجلسة السابقة وبدء الحصة من الصفر لجميع المجموعات.");
             if(!ok) return;
 
             const banner = document.getElementById('teacher-status-banner');
@@ -1080,7 +1085,7 @@ function escapeHtml(value) {
             const banner = document.getElementById('teacher-status-banner');
             if(!tbody) return;
             
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-ccTextMuted"><i class="fa-solid fa-spinner fa-spin ml-2"></i> جارٍ تحميل النتائج...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-ccTextMuted"><i class="fa-solid fa-spinner fa-spin ml-2"></i> جارٍ تحديث النتائج...</td></tr>`;
             
             try {
                 const list = await getLeaderboard();
@@ -2907,11 +2912,9 @@ function escapeHtml(value) {
             if(document.visibilityState === 'hidden') saveLocalState();
         });
 
-        // إذا كانت لوحة المعلمة مفتوحة في تبويب آخر على الجهاز نفسه، حدّثها عند تغيّر التخزين.
+        // تحديث لوحة النتائج يدوي فقط. تغيّر التخزين لا يعيد تحميل لوحة المعلمة تلقائيًا.
         window.addEventListener('storage', (event) => {
             if(event.key === STORAGE_KEYS.localLeaderboard || event.key === STORAGE_KEYS.activeStudent) {
-                const teacher = document.getElementById('screen-teacher');
-                if(teacher && !teacher.classList.contains('hidden-screen')) refreshTeacherLeaderboard();
                 updateResumeCard();
             }
         });

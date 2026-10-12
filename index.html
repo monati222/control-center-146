@@ -1,0 +1,2333 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CONTROL CENTER 146 - مركز التحكم الذكي</title>
+    <!-- Google Fonts: Tajawal -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ccBg: '#081426',
+                        ccCard: '#0e1f3a',
+                        ccCardHover: '#13284a',
+                        ccBorder: '#1a3256',
+                        ccGold: '#FFD700',
+                        ccBlue: '#00a8ff',
+                        ccGreen: '#00d26a',
+                        ccRed: '#ff4757',
+                        ccWarning: '#ffa502',
+                        ccTextMain: '#f8fafc',
+                        ccTextMuted: '#94a3b8'
+                    },
+                    fontFamily: {
+                        sans: ['Tajawal', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --text-hero: clamp(40px, 3.5vw, 56px);
+            --text-title: clamp(32px, 3vw, 42px);
+            --text-q: clamp(26px, 2.2vw, 34px);
+            --text-body: clamp(22px, 1.6vw, 28px);
+            --text-sm: clamp(18px, 1.3vw, 22px);
+        }
+
+        body {
+            background-color: #081426;
+            color: #f8fafc;
+            font-family: 'Tajawal', sans-serif;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #081426; }
+        ::-webkit-scrollbar-thumb { background: #1a3256; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00a8ff; }
+
+        .txt-hero { font-size: var(--text-hero); font-weight: 900; line-height: 1.2; }
+        .txt-title { font-size: var(--text-title); font-weight: 800; }
+        .txt-q { font-size: var(--text-q); font-weight: 700; }
+        .txt-body { font-size: var(--text-body); font-weight: 500; }
+        .txt-sm { font-size: var(--text-sm); font-weight: 500; }
+
+        .glass-card {
+            background: #0e1f3a;
+            border: 2px solid #1a3256;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            padding: 2.5rem;
+        }
+
+        .input-lg {
+            width: 100%;
+            background: #081426;
+            border: 2px solid #1a3256;
+            color: white;
+            font-size: var(--text-body);
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+        .input-lg:focus { border-color: #00a8ff; box-shadow: 0 0 15px rgba(0,168,255,0.3); }
+
+        .btn-huge {
+            font-size: var(--text-body);
+            font-weight: 700;
+            padding: 1rem 2rem;
+            min-height: 60px;
+            border-radius: 0.75rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            text-align: center;
+            border: 2px solid transparent;
+        }
+
+        .btn-action { background: #00a8ff; color: #081426; }
+        .btn-action:hover:not(:disabled) { background: #33b8ff; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,168,255,0.4); }
+        .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-outline { background: transparent; border-color: #2a4365; color: white; }
+        .btn-outline:hover:not(:disabled) { background: #13284a; border-color: #00a8ff; }
+        .btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .feed-box { padding: 1.25rem; border-radius: 0.75rem; margin-top: 1rem; font-weight: bold; font-size: var(--text-body); animation: slideUp 0.3s ease-out; }
+        .feed-success { background: rgba(0, 210, 106, 0.12); border: 2px solid #00d26a; color: #00d26a; }
+        .feed-error { background: rgba(255, 71, 87, 0.12); border: 2px solid #ff4757; color: #ff4757; }
+        .feed-warning { background: rgba(255, 165, 2, 0.12); border: 2px solid #ffa502; color: #ffa502; }
+
+        .slide-up { animation: slideUp 0.4s ease-out forwards; }
+        .pulse-score { animation: pulseScore 0.4s ease-out; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulseScore { 0% { background-color: #00d26a; color: #081426; transform: scale(1.1); } 100% { background-color: transparent; color: #00a8ff; transform: scale(1); } }
+
+        .hidden-screen { display: none !important; }
+        .custom-scroll { overflow-y: auto; max-height: 70vh; }
+    </style>
+</head>
+<body class="flex flex-col h-screen select-none">
+
+    <!-- Top Navigation Bar -->
+    <header id="top-bar" class="hidden-screen flex-shrink-0 border-b border-ccBorder bg-ccBg px-8 py-4 z-50 sticky top-0 shadow-lg">
+        <div class="max-w-[1900px] mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-6">
+                <button type="button" onclick="goToPrevActivity()" id="prev-btn" class="btn-outline py-2 px-4 text-sm hidden">
+                    <i class="fa-solid fa-arrow-right ml-2"></i> النشاط السابق
+                </button>
+                <span class="text-ccGold font-bold txt-sm tracking-wider uppercase" dir="ltr">CC-146</span>
+                <span id="header-leader-name" class="txt-sm text-ccTextMain bg-ccCard px-4 py-2 rounded-lg border border-ccBorder">المجموعة: -</span>
+            </div>
+            
+            <div class="flex flex-col items-center">
+                <div id="timer-display" class="txt-title font-mono font-bold text-white px-6 py-1 rounded-xl bg-ccCard border-2 border-ccBorder min-w-[140px] text-center shadow-inner">
+                    ⏱ 01:00
+                </div>
+                <div class="w-full bg-ccBorder h-1.5 rounded-full mt-1.5 overflow-hidden">
+                    <div id="timer-progress" class="bg-ccBlue h-full w-full transition-all duration-1000"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <span id="activity-counter" class="txt-sm font-bold text-ccBlue">النشاط 1 من 15</span>
+                <span id="score-display" class="bg-ccCard px-6 py-2 rounded-xl text-ccBlue border border-ccBlue txt-body font-bold transition-all duration-300">⭐ 0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow relative overflow-y-auto p-6 lg:p-10 flex flex-col items-center justify-start w-full">
+
+        <!-- SCREEN 1: HOME -->
+        <section id="screen-home" class="w-full max-w-5xl mx-auto flex flex-col items-center justify-center min-h-[80vh] text-center slide-up">
+            <div class="inline-flex items-center justify-center w-28 h-28 bg-ccCard border-2 border-ccBorder rounded-3xl mb-6 shadow-2xl text-ccBlue text-5xl">
+                <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <h1 class="txt-hero text-ccGold mb-2 uppercase tracking-widest" dir="ltr">CONTROL CENTER 146</h1>
+            <h2 class="txt-title text-ccTextMain mb-12">مركز التحكم الذكي – الثانوية 146</h2>
+            
+            <div class="glass-card w-full max-w-3xl mb-12 text-center bg-gradient-to-b from-ccCard to-ccBg border-ccBorder">
+                <div class="text-ccGold txt-q mb-3"><i class="fa-solid fa-triangle-exclamation ml-2"></i> تنبيه نظام المراقبة</div>
+                <p class="txt-body text-ccTextMuted leading-relaxed">
+                    «وصلت عدة بلاغات إلى مركز التحكم في الثانوية 146. بعض الأنظمة تعمل بصورة غير طبيعية. مهمتكن: تحليل البيانات، اكتشاف الخلل، واتخاذ القرار الصحيح.»
+                </p>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-6 w-full max-w-3xl justify-center">
+                <button type="button" onclick="showStudentLogin()" class="btn-huge btn-action flex-1 shadow-lg">
+                    <i class="fa-solid fa-users text-2xl"></i> دخول مجموعة
+                </button>
+                <button type="button" onclick="showTeacherDashboard()" class="btn-huge btn-outline flex-1 shadow-lg">
+                    <i class="fa-solid fa-chalkboard-user text-2xl"></i> دخول معلمة
+                </button>
+            </div>
+        </section>
+
+        <!-- SCREEN 2: STUDENT LOGIN -->
+        <section id="screen-student-login" class="hidden-screen w-full max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[75vh] text-center slide-up">
+            <div class="glass-card w-full">
+                <div class="text-ccBlue text-4xl mb-4"><i class="fa-solid fa-id-badge"></i></div>
+                <h2 class="txt-title text-ccGold mb-6">تسجيل المجموعة</h2>
+                <div class="text-right mb-6">
+                    <label class="txt-q text-ccTextMain block mb-3">اسم قائدة المجموعة (يمثل المجموعة كاملة):</label>
+                    <input type="text" id="leader-name-input" class="input-lg text-center" placeholder="مثال: نورة..." autocomplete="off">
+                    <div id="login-error" class="text-ccRed txt-sm mt-2 hidden font-bold">⚠️ اكتبي اسم قائدة المجموعة أولاً.</div>
+                </div>
+                <button type="button" onclick="startStudentSession()" class="btn-huge btn-action w-full mt-2 shadow-xl">
+                    دخول مركز التحكم <i class="fa-solid fa-power-off mr-2"></i>
+                </button>
+                <button type="button" onclick="goToScreen('screen-home')" class="txt-sm text-ccTextMuted mt-6 hover:text-white transition-colors block mx-auto">
+                    <i class="fa-solid fa-arrow-right ml-1"></i> عودة للشاشة الرئيسية
+                </button>
+            </div>
+        </section>
+
+        <!-- SCREEN 3: TEACHER DASHBOARD -->
+        <section id="screen-teacher" class="hidden-screen w-full max-w-6xl mx-auto flex flex-col min-h-[80vh]">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-ccBorder pb-6">
+                <div>
+                    <h2 class="txt-title text-ccGold"><i class="fa-solid fa-ranking-star ml-3"></i> لوحة المجموعات (معلمة الفصل)</h2>
+                    <p class="txt-sm text-ccTextMuted mt-1">متابعة مباشرة لدرجات وحالة المجموعات في الحصة الحالية</p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button type="button" onclick="refreshTeacherLeaderboard()" class="btn-huge btn-outline py-2 px-6"><i class="fa-solid fa-rotate ml-2"></i> تحديث النتائج</button>
+                    <button type="button" onclick="sendTeacherEmail()" class="btn-huge btn-outline py-2 px-6 border-ccBlue text-ccBlue"><i class="fa-solid fa-envelope ml-2"></i> إرسال النتائج لبريدي</button>
+                    <button type="button" onclick="goToScreen('screen-home')" class="btn-huge btn-outline py-2 px-6"><i class="fa-solid fa-house ml-2"></i> خروج</button>
+                </div>
+            </div>
+
+            <div id="teacher-status-banner" class="hidden mb-4 p-4 rounded-xl border text-center txt-body"></div>
+
+            <div class="glass-card flex-grow custom-scroll p-0 overflow-hidden">
+                <table class="w-full text-right border-collapse">
+                    <thead class="bg-ccBg border-b border-ccBorder text-ccTextMuted txt-body sticky top-0">
+                        <tr>
+                            <th class="py-4 px-6 font-bold">الترتيب</th>
+                            <th class="py-4 px-6 font-bold">اسم القائدة</th>
+                            <th class="py-4 px-6 font-bold">المجموع الكلي</th>
+                            <th class="py-4 px-6 font-bold">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teacher-leaderboard-body" class="txt-body divide-y divide-ccBorder">
+                        <!-- Filled dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- DYNAMIC ACTIVITY CONTAINER -->
+        <section id="activity-viewport" class="hidden-screen w-full max-w-5xl mx-auto flex flex-col flex-grow slide-up">
+            <!-- Dynamic Activity Content injected here -->
+        </section>
+
+    </main>
+
+    <!-- Footer Setup Guide -->
+    <footer class="flex-shrink-0 bg-ccBg border-t border-ccBorder py-3 px-6 text-center text-xs text-ccTextMuted flex justify-between items-center">
+        <div>CONTROL CENTER 146 &bull; التقنية الرقمية 1-1</div>
+        <div>
+            <button type="button" onclick="toggleDevGuide()" class="text-ccBlue hover:underline"><i class="fa-solid fa-code ml-1"></i> إعدادات الربط والـ Backend</button>
+        </div>
+    </footer>
+
+    <!-- Dev Guide Modal -->
+    <div id="dev-guide-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="glass-card max-w-4xl w-full max-h-[90vh] overflow-y-auto text-right relative">
+            <button type="button" onclick="toggleDevGuide()" class="absolute top-4 left-4 text-2xl text-ccTextMuted hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="txt-title text-ccGold mb-4"><i class="fa-solid fa-gears ml-2"></i> خطوات الربط لـ Google Apps Script & Sheets</h3>
+            <ol class="list-decimal list-inside space-y-3 txt-body text-ccTextMuted mb-6 leading-relaxed">
+                <li>أنشئ ملف <strong class="text-white">Google Sheet</strong> جديد.</li>
+                <li>من القائمة اختر <strong class="text-white">Extensions > Apps Script</strong> واحذف أي كود افتراضي.</li>
+                <li>ألصق كود الـ Backend المرفق أدناه في محرر Apps Script.</li>
+                <li>أضف في <strong class="text-white">Project Settings > Script Properties</strong> خاصية باسم <code class="text-ccBlue">TEACHER_EMAIL</code> وضع بريدك الإلكتروني.</li>
+                <li>انقر فوق <strong class="text-white">Deploy > New Deployment</strong> واختر نوع <strong class="text-white">Web App</strong> (Execute as: Me, Who has access: Anyone).</li>
+                <li>انسخ الرابط الناتج (Web App URL) وضعه في متغير <code class="text-ccBlue">BACKEND_URL</code> في الكود أدناه.</li>
+            </ol>
+            <div class="bg-ccBg p-4 rounded-xl border border-ccBorder mb-6">
+                <label class="block text-ccGold txt-sm mb-2 font-bold">ضع رابط الـ Web App هنا:</label>
+                <div class="flex gap-3">
+                    <input type="text" id="backend-url-input" class="input-lg text-sm font-mono" placeholder="https://script.google.com/macros/s/.../exec">
+                    <button type="button" onclick="saveBackendUrl()" class="btn-huge btn-action py-2 px-6 text-sm">حفظ</button>
+                </div>
+            </div>
+            <h4 class="txt-q text-ccBlue mb-2">كود Google Apps Script المقترح (Backend):</h4>
+            <pre class="bg-ccBg p-4 rounded-xl border border-ccBorder text-xs text-ccTextMain overflow-x-auto font-mono text-left" dir="ltr">
+const ss = SpreadsheetApp.getActiveSpreadsheet();
+const sheet = ss.getSheetByName("Leaderboard") || ss.insertSheet("Leaderboard");
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
+    if (action === "sync") {
+      return ContentService.createTextOutput(JSON.stringify(syncRecord(data))).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "leaderboard") {
+      return ContentService.createTextOutput(JSON.stringify(getLeaderboardData(data.sessionId))).setMimeType(ContentService.MimeType.JSON);
+    } else if (action === "email") {
+      return ContentService.createTextOutput(JSON.stringify(sendEmailReport(data.sessionId))).setMimeType(ContentService.MimeType.JSON);
+    }
+    return ContentService.createTextOutput(JSON.stringify({error: "Invalid action"})).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({status: "Active"})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getActiveSessionId() {
+  const today = new Date().toISOString().split('T')[0];
+  return "SES_" + today;
+}
+
+function syncRecord(data) {
+  const sessionId = data.sessionId || getActiveSessionId();
+  const leaderName = data.leaderName;
+  const rows = sheet.getDataRange().getValues();
+  
+  let foundRow = -1;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === sessionId && rows[i][1] === leaderName) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+  
+  const now = new Date().toISOString();
+  const score = Number(data.totalScore) || 0;
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 3).setValue(score);
+    sheet.getRange(foundRow, 4).setValue(data.status);
+    sheet.getRange(foundRow, 5).setValue(data.currentActivity);
+    sheet.getRange(foundRow, 7).setValue(now);
+    if(data.status === "مكتمل") sheet.getRange(foundRow, 8).setValue(now);
+  } else {
+    sheet.appendRow([sessionId, leaderName, score, data.status, data.currentActivity, now, now, ""]);
+  }
+  return {success: true, sessionId: sessionId};
+}
+
+function getLeaderboardData(sessionId) {
+  const sid = sessionId || getActiveSessionId();
+  const rows = sheet.getDataRange().getValues();
+  let list = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === sid) {
+      list.push({
+        sessionId: rows[i][0],
+        leaderName: rows[i][1],
+        totalScore: Number(rows[i][2]) || 0,
+        status: rows[i][3],
+        currentActivity: Number(rows[i][4]) || 1,
+        startedAt: rows[i][5],
+        lastUpdatedAt: rows[i][6],
+        finishedAt: rows[i][7]
+      });
+    }
+  }
+  list.sort((a,b) => b.totalScore - a.totalScore || (a.finishedAt || "9999").localeCompare(b.finishedAt || "9999"));
+  return {success: true, leaderboard: list};
+}
+
+function sendEmailReport(sessionId) {
+  const email = PropertiesService.getScriptProperties().getProperty("TEACHER_EMAIL");
+  if (!email) return {success: false, error: "Teacher email not set"};
+  
+  const data = getLeaderboardData(sessionId);
+  let html = "&lt;h2&gt;تقرير مركز التحكم الذكي - الثانوية 146&lt;/h2&gt;&lt;table border='1' cellpadding='8' style='border-collapse:collapse;'&gt;&lt;tr&gt;&lt;th&gt;الترتيب&lt;/th&gt;&lt;th&gt;القائدة&lt;/th&gt;&lt;th&gt;النقاط&lt;/th&gt;&lt;th&gt;الحالة&lt;/th&gt;&lt;/tr&gt;";
+  
+  data.leaderboard.forEach((item, idx) => {
+    html += `&lt;tr&gt;&lt;td&gt;${idx+1}&lt;/td&gt;&lt;td&gt;${item.leaderName}&lt;/td&gt;&lt;td&gt;${item.totalScore}&lt;/td&gt;&lt;td&gt;${item.status}&lt;/td&gt;&lt;/tr&gt;`;
+  });
+  html += "&lt;/table&gt;";
+  
+  GmailApp.sendEmail(email, "تقرير نتائج حصة التقنية الرقمية - مركز التحكم 146", "", {htmlBody: html});
+  return {success: true};
+}
+            </pre>
+        </div>
+    </div>
+
+    <!-- APPLICATION LOGIC & ACTIVITIES ENGINE -->
+    <script>
+        /* -------------------------------------------------------------------------- */
+        /*                          CENTRAL STATE & BACKEND                           */
+        /* -------------------------------------------------------------------------- */
+        const APP_STATE = {
+            leaderName: "",
+            sessionId: "SES_" + new Date().toISOString().split('T')[0],
+            score: 0,
+            currentActivity: 1,
+            status: "قيد الحل",
+            startedAt: new Date().toISOString(),
+            lastUpdatedAt: new Date().toISOString(),
+            finishedAt: "",
+            activity14Design: {},
+            history: {}, 
+            timerSeconds: 60,
+            timerInterval: null,
+            isExtraTime: false,
+            extraSeconds: 0
+        };
+
+        let BACKEND_URL = localStorage.getItem("cc146_backend_url") || "";
+
+        function saveLocalState() {
+            try {
+                localStorage.setItem("cc146_active_student", JSON.stringify(APP_STATE));
+                let allLocal = JSON.parse(localStorage.getItem("cc146_local_leaderboard") || "{}");
+                allLocal[APP_STATE.leaderName] = { 
+                    sessionId: APP_STATE.sessionId,
+                    leaderName: APP_STATE.leaderName,
+                    totalScore: Number(APP_STATE.score) || 0,
+                    status: APP_STATE.status,
+                    currentActivity: APP_STATE.currentActivity,
+                    startedAt: APP_STATE.startedAt,
+                    lastUpdatedAt: APP_STATE.lastUpdatedAt,
+                    finishedAt: APP_STATE.finishedAt
+                };
+                localStorage.setItem("cc146_local_leaderboard", JSON.stringify(allLocal));
+            } catch(e) {}
+        }
+
+        async function syncWithBackend() {
+            saveLocalState();
+            if (!BACKEND_URL) return;
+            try {
+                await fetch(BACKEND_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify({ 
+                        action: "sync", 
+                        sessionId: APP_STATE.sessionId,
+                        leaderName: APP_STATE.leaderName,
+                        totalScore: Number(APP_STATE.score) || 0,
+                        status: APP_STATE.status,
+                        currentActivity: APP_STATE.currentActivity,
+                        startedAt: APP_STATE.startedAt,
+                        lastUpdatedAt: APP_STATE.lastUpdatedAt,
+                        finishedAt: APP_STATE.finishedAt
+                    })
+                });
+            } catch(e) {
+                console.warn("Backend sync offline fallback active");
+            }
+        }
+
+        async function fetchLeaderboardFromBackend() {
+            if (!BACKEND_URL) throw new Error("No backend URL configured");
+            const res = await fetch(BACKEND_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify({ action: "leaderboard", sessionId: APP_STATE.sessionId })
+            });
+            const data = await res.json();
+            if (data && data.success) return data.leaderboard;
+            throw new Error("Failed to load from server");
+        }
+
+        async function getLeaderboard() {
+            try {
+                if (BACKEND_URL) {
+                    const remoteList = await fetchLeaderboardFromBackend();
+                    if (remoteList && remoteList.length > 0) {
+                        return remoteList.map(item => ({
+                            ...item,
+                            totalScore: Number(item.totalScore) || 0
+                        }));
+                    }
+                }
+            } catch(e) {}
+            
+            try {
+                let allLocal = JSON.parse(localStorage.getItem("cc146_local_leaderboard") || "{}");
+                let list = Object.values(allLocal).map(item => ({
+                    ...item,
+                    totalScore: Number(item.totalScore) || 0
+                }));
+                list.sort((a,b) => b.totalScore - a.totalScore || (a.finishedAt || "9999").localeCompare(b.finishedAt || "9999"));
+                return list;
+            } catch(e) {
+                return [];
+            }
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /*                              AI SIMULATED ENGINE                           */
+        /* -------------------------------------------------------------------------- */
+        async function verifyBrainstormIdeaAI(idea) {
+            const clean = idea.trim().toLowerCase();
+            if (!clean || clean.length < 2) return { status: "UNCLEAR", reason: "الفكرة قصيرة جداً." };
+            
+            // STRICT REJECTION FOR MEANINGLESS / NONSENSE TEXTS
+            const nonsense = ["بلا", "لا", "نعم", "هههه", "123", "أحمد", "محمد", "اختبار", "تجربة", "مرحبا", "سلام", "شيء", "اي شي", "ما ادري", "الجو", "سماء", "ارض", "بحر", "طاولة", "قلم", "كتاب", "كرسي", "شباك", "باب عادي", "جدار", "ارضية", "حائط", "ساعة يد", "عصا"];
+            if (nonsense.includes(clean) || /^[0-9\s!@#$%^&*()_+=\-\[\]{}|;':",./<>?]+$/.test(clean)) {
+                return { status: "INVALID", reason: "الإجابة لا تمثل جهاز مراقبة أو تحكم رقمي أو ذكي." };
+            }
+
+            const invalids = ["لا شيء", "مكتب", "كرسي", "جدار", "قلم", "طاولة", "كتاب", "هواء", "ماء", "شمس"];
+            if (invalids.some(w => clean.includes(w))) return { status: "INVALID", reason: "لا تمثل نظام مراقبة أو تحكم." };
+
+            const commonKeywords = ["كاميرا", "مكيف", "باب", "إنذار", "حساس", "مستشعر", "ساعة", "إضاءة", "مضخة", "ثلاجة", "سيارة", "مرور", "قفل", "بصمة", "جهاز", "نظام", "تتبع", "رصد", "تحكم", "مراقبة", "بوابة", "مصعد", "تدفئة", "انذار", "تنبيه", "روبوت", "شاشه", "شاشة", "مركبة", "طائرة", "دخان", "حرارة", "رطوبة", "ضغط", "حراره"];
+            if (commonKeywords.some(k => clean.includes(k))) return { status: "VALID", reason: "فكرة مقبولة لنظام مراقبة أو تحكم." };
+
+            // If it contains descriptive words of systems
+            if (clean.length >= 4 && (clean.includes("ذكي") || clean.includes("آلي") || clean.includes("الكتروني") || clean.includes("إلكتروني") || clean.includes("تلقائي"))) {
+                return { status: "VALID", reason: "فكرة مقبولة لنظام مراقبة أو تحكم." };
+            }
+
+            return { status: "INVALID", reason: "الإجابة غير مرتبطة بأجهزة المراقبة أو التحكم." };
+        }
+
+        async function evaluateOpenActivityAI(text, type) {
+            if (!text || text.trim().length < 5) return { score: 1, feedback: "الإجابة مختصرة جداً." };
+            let words = text.trim().split(/\s+/).length;
+            if (words > 15) return { score: 5, feedback: "إجابة شاملة وممتازة." };
+            if (words > 8) return { score: 4, feedback: "إجابة جيدة ومرتبطة بالموضوع." };
+            return { score: 3, feedback: "إجابة مقبولة، ويمكن إثراؤها بتفاصيل أكثر." };
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /*                           NAVIGATION & UI ROUTER                           */
+        /* -------------------------------------------------------------------------- */
+        function goToScreen(screenId) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden-screen'));
+            const target = document.getElementById(screenId);
+            if (target) {
+                target.classList.remove('hidden-screen');
+                target.classList.add('slide-up');
+            }
+            const topBar = document.getElementById('top-bar');
+            if (screenId === 'screen-home' || screenId === 'screen-student-login' || screenId === 'screen-teacher' || screenId === 'screen-end') {
+                if(topBar) topBar.classList.add('hidden-screen');
+                stopTimer();
+            } else {
+                if(topBar) topBar.classList.remove('hidden-screen');
+            }
+        }
+
+        function showStudentLogin() {
+            goToScreen('screen-student-login');
+        }
+
+        function startStudentSession() {
+            const input = document.getElementById('leader-name-input');
+            const err = document.getElementById('login-error');
+            const name = input ? input.value.trim() : "";
+            if (!name) {
+                if(err) err.classList.remove('hidden');
+                return;
+            }
+            APP_STATE.leaderName = name;
+            APP_STATE.startedAt = new Date().toISOString();
+            APP_STATE.currentActivity = 1;
+            APP_STATE.score = 0;
+            syncWithBackend();
+
+            const nameHeader = document.getElementById('header-leader-name');
+            if(nameHeader) nameHeader.innerText = `المجموعة: ${name}`;
+
+            renderActivity(1);
+        }
+
+        async function showTeacherDashboard() {
+            goToScreen('screen-teacher');
+            await refreshTeacherLeaderboard();
+            if(window.teacherInterval) clearInterval(window.teacherInterval);
+            window.teacherInterval = setInterval(refreshTeacherLeaderboard, 7000);
+        }
+
+        async function refreshTeacherLeaderboard() {
+            const tbody = document.getElementById('teacher-leaderboard-body');
+            const banner = document.getElementById('teacher-status-banner');
+            if(!tbody) return;
+            
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-ccTextMuted"><i class="fa-solid fa-spinner fa-spin ml-2"></i> جارٍ تحميل النتائج...</td></tr>`;
+            
+            try {
+                const list = await getLeaderboard();
+                if(banner) banner.classList.add('hidden');
+                tbody.innerHTML = "";
+                
+                if(list.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 txt-title text-ccTextMuted">بانتظار دخول المجموعات في الحصة...</td></tr>`;
+                    return;
+                }
+                
+                list.forEach((item, idx) => {
+                    let badgeClass = 'bg-ccCard text-ccTextMain border-ccBorder';
+                    if(idx === 0) badgeClass = 'bg-[rgba(255,215,0,0.15)] text-ccGold border-ccGold';
+                    else if(idx === 1) badgeClass = 'bg-[rgba(192,192,192,0.15)] text-gray-200 border-gray-400';
+                    else if(idx === 2) badgeClass = 'bg-[rgba(205,127,50,0.15)] text-[#cd7f32] border-[#cd7f32]';
+                    
+                    const statusColor = item.status === 'مكتمل' ? 'text-ccGreen' : 'text-ccWarning';
+                    const scoreVal = Number(item.totalScore) || 0;
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-ccCard transition-colors">
+                            <td class="py-4 px-6"><span class="px-3 py-1 rounded-lg border font-bold ${badgeClass}">${idx + 1}</span></td>
+                            <td class="py-4 px-6 font-bold txt-body">${item.leaderName}</td>
+                            <td class="py-4 px-6 font-mono text-ccBlue txt-body font-bold">⭐ ${scoreVal} نقطة</td>
+                            <td class="py-4 px-6 font-bold ${statusColor} txt-body">${item.status}</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                if(banner) {
+                    banner.className = "mb-4 p-4 rounded-xl border border-ccRed bg-[rgba(255,71,87,0.1)] text-ccRed text-center txt-body";
+                    banner.innerHTML = "⚠️ تعذر تحميل النتائج المشتركة من الخادم. <button onclick='refreshTeacherLeaderboard()' class='underline mr-2'>إعادة المحاولة</button>";
+                    banner.classList.remove('hidden');
+                }
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-ccRed font-bold">تعذر تحميل لوحة النتائج حاليًا.</td></tr>`;
+            }
+        }
+
+        async function sendTeacherEmail() {
+            if(!BACKEND_URL) {
+                alert("برجاء إعداد رابط BACKEND_URL في إعدادات الربط أولاً.");
+                return;
+            }
+            try {
+                const res = await fetch(BACKEND_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify({ action: "email", sessionId: APP_STATE.sessionId })
+                });
+                const data = await res.json();
+                if(data && data.success) {
+                    alert("✅ تم إرسال تقرير النتائج إلى بريدك الإلكتروني بنجاح.");
+                } else {
+                    alert("⚠️ تعذر الإرسال: تأكد من إعداد TEACHER_EMAIL في الـ Apps Script.");
+                }
+            } catch(e) {
+                alert("⚠️ حدث خطأ أثناء الاتصال بالخادم لإرسال البريد.");
+            }
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /*                           TIMER & SCORING ENGINE                           */
+        /* -------------------------------------------------------------------------- */
+        function startTimer(seconds = 60) {
+            stopTimer();
+            APP_STATE.timerSeconds = seconds;
+            APP_STATE.isExtraTime = false;
+            APP_STATE.extraSeconds = 0;
+            
+            const display = document.getElementById('timer-display');
+            const progress = document.getElementById('timer-progress');
+            if(!display) return;
+            
+            display.className = 'txt-title font-mono font-bold text-white px-6 py-1 rounded-xl bg-ccCard border-2 border-ccBorder min-w-[140px] text-center shadow-inner';
+            
+            APP_STATE.timerInterval = setInterval(() => {
+                if(!APP_STATE.isExtraTime) {
+                    APP_STATE.timerSeconds--;
+                    let m = Math.floor(APP_STATE.timerSeconds / 60).toString().padStart(2, '0');
+                    let s = (APP_STATE.timerSeconds % 60).toString().padStart(2, '0');
+                    display.innerText = `⏱ ${m}:${s}`;
+                    if(progress) progress.style.width = `${(APP_STATE.timerSeconds / seconds) * 100}%`;
+                    
+                    if(APP_STATE.timerSeconds <= 0) {
+                        APP_STATE.isExtraTime = true;
+                        display.className = 'txt-title font-mono font-bold text-ccWarning px-6 py-1 rounded-xl bg-[rgba(255,165,2,0.1)] border-2 border-ccWarning min-w-[140px] text-center';
+                        if(progress) progress.style.width = '0%';
+                    }
+                } else {
+                    APP_STATE.extraSeconds++;
+                    let m = Math.floor(APP_STATE.extraSeconds / 60).toString().padStart(2, '0');
+                    let s = (APP_STATE.extraSeconds % 60).toString().padStart(2, '0');
+                    display.innerHTML = `<span class="text-xs block text-ccTextMuted -mb-1">وقت إضافي</span>+${m}:${s}`;
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if(APP_STATE.timerInterval) clearInterval(APP_STATE.timerInterval);
+        }
+
+        function calculateEarnedPoints(attemptCount, isFirstHalfTime) {
+            let base = 5 - (attemptCount - 1);
+            if(base < 1) base = 1;
+            
+            let speed = 0;
+            if(!APP_STATE.isExtraTime) {
+                speed = isFirstHalfTime ? 2 : 1;
+            }
+            return { base, speed, total: base + speed };
+        }
+
+        function awardScore(qId, attemptCount, isFirstHalfTime) {
+            if(APP_STATE.history[qId] && APP_STATE.history[qId].scored) return 0;
+            
+            const pts = calculateEarnedPoints(attemptCount, isFirstHalfTime);
+            APP_STATE.score = (Number(APP_STATE.score) || 0) + pts.total;
+            APP_STATE.history[qId] = { scored: true, base: pts.base, speed: pts.speed };
+            
+            const scoreDisplay = document.getElementById('score-display');
+            if(scoreDisplay) {
+                scoreDisplay.innerText = `⭐ ${APP_STATE.score}`;
+                scoreDisplay.classList.remove('pulse-score');
+                void scoreDisplay.offsetWidth;
+                scoreDisplay.classList.add('pulse-score');
+            }
+            syncWithBackend();
+            return pts;
+        }
+
+        function showFeedback(containerId, type, message, ptsObj = null) {
+            const container = document.getElementById(containerId);
+            if(!container) return;
+            
+            let html = '';
+            if(type === 'success') {
+                html = `<div class="feed-box feed-success"><i class="fa-solid fa-circle-check ml-2 text-2xl align-middle"></i> <span class="align-middle">${message}</span>`;
+                if(ptsObj && ptsObj.total > 0) {
+                    html += `<div class="mt-2 text-ccGold">⭐ حصلتن على +${ptsObj.base} نقاط أساسية`;
+                    if(ptsObj.speed > 0) html += ` | ⚡ +${ptsObj.speed} سرعة (الإجمالي: +${ptsObj.total})`;
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            } else if(type === 'error') {
+                html = `<div class="feed-box feed-error"><i class="fa-solid fa-circle-xmark ml-2 text-2xl align-middle"></i> <span class="align-middle">${message}</span><div class="mt-2 text-sm text-ccTextMain opacity-80">⭐ لم تتم إضافة نقاط لهذه المحاولة. حاولي مرة أخرى.</div></div>`;
+            } else if(type === 'warning') {
+                html = `<div class="feed-box feed-warning"><i class="fa-solid fa-triangle-exclamation ml-2 text-2xl align-middle"></i> <span class="align-middle">${message}</span></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /*                          ACTIVITIES ROUTER (1 TO 15)                       */
+        /* -------------------------------------------------------------------------- */
+        const ACTIVITIES = [
+            renderActivity1, renderActivity2, renderActivity3, renderActivity4, renderActivity5,
+            renderActivity6, renderActivity7, renderActivity8, renderActivity9, renderActivity10,
+            renderActivity11, renderActivity12, renderActivity13, renderActivity14, renderActivity15
+        ];
+
+        function renderActivity(num) {
+            if(num < 1 || num > 15) return;
+            APP_STATE.currentActivity = num;
+            syncWithBackend();
+            
+            goToScreen('activity-viewport');
+            const counter = document.getElementById('activity-counter');
+            if(counter) counter.innerText = `النشاط ${num} من 15`;
+            
+            const prevBtn = document.getElementById('prev-btn');
+            if(prevBtn) {
+                if(num > 1) prevBtn.classList.remove('hidden');
+                else prevBtn.classList.add('hidden');
+            }
+
+            const viewport = document.getElementById('activity-viewport');
+            if(viewport) {
+                viewport.innerHTML = "";
+                ACTIVITIES[num - 1](viewport);
+            }
+        }
+
+        function goToPrevActivity() {
+            if(APP_STATE.currentActivity > 1) {
+                renderActivity(APP_STATE.currentActivity - 1);
+            }
+        }
+
+        function goToNextActivity() {
+            if(APP_STATE.currentActivity < 15) {
+                renderActivity(APP_STATE.currentActivity + 1);
+            } else {
+                finishAllChallenges();
+            }
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /*                          INDIVIDUAL ACTIVITIES                             */
+        /* -------------------------------------------------------------------------- */
+
+        // --- ACTIVITY 1: تحدي الرصد ---
+        function renderActivity1(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act1) APP_STATE.history.act1 = { ideas: [], attempts: 0 };
+            
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">🎯 النشاط 1: كم نظامًا تستطيعين اكتشافه؟</h2>
+                    <p class="txt-q mb-6">«بعد مشاهدة المقطع، عددي أكبر عدد ممكن من الأمثلة على أجهزة تراقب أو تتحكم في حياتنا (مثل: كاميرا مراقبة، مكيف ذكي، نظام إنذار).»</p>
+                    
+                    <div class="flex gap-4 mb-6">
+                        <input type="text" id="act1-input" class="input-lg" placeholder="اكتبي مثالاً لجهاز مراقبة أو تحكم دقيق..." autocomplete="off">
+                        <button type="button" onclick="submitAct1Idea()" class="btn-huge btn-action px-8 flex-shrink-0">+ إضافة</button>
+                    </div>
+                    
+                    <div id="act1-feedback"></div>
+                    
+                    <div class="mt-6">
+                        <h3 class="txt-sm font-bold text-ccBlue mb-3">الأفكار المرصودة والمعتمدة:</h3>
+                        <div id="act1-ideas-list" class="flex flex-wrap gap-3 min-h-[80px] p-4 bg-ccBg rounded-xl border border-ccBorder">
+                            ${APP_STATE.history.act1.ideas.length === 0 ? '<span class="text-ccTextMuted txt-sm">لم تتم إضافة أي أفكار بعد...</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" onclick="finishAct1()" class="btn-huge btn-action">انتهينا والانتقال للنشاط 2 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                </div>
+            `;
+            
+            const input = document.getElementById('act1-input');
+            if(input) {
+                input.addEventListener('keypress', (e) => { if(e.key === 'Enter') submitAct1Idea(); });
+            }
+            renderAct1Ideas();
+        }
+
+        async function submitAct1Idea() {
+            const input = document.getElementById('act1-input');
+            if(!input) return;
+            const val = input.value.trim();
+            if(!val) return;
+            
+            showFeedback('act1-feedback', 'warning', 'جارٍ التحقق من الفكرة بالذكاء الاصطناعي...');
+            const aiResult = await verifyBrainstormIdeaAI(val);
+            
+            const history = APP_STATE.history.act1;
+            const qId = `act1_${val}`;
+            
+            if(aiResult.status === 'VALID') {
+                // Check duplicate
+                if(history.ideas.some(i => i.text.toLowerCase() === val.toLowerCase())) {
+                    showFeedback('act1-feedback', 'error', '🔁 هذه الفكرة مكررة أو قريبة جدًا من فكرة سابقة.');
+                    return;
+                }
+                history.ideas.push({ text: val, status: 'VALID' });
+                input.value = "";
+                
+                const isFirstHalf = APP_STATE.timerSeconds > 30;
+                let pts = awardScore(qId, 1, isFirstHalf);
+                showFeedback('act1-feedback', 'success', '✅ تم قبول الفكرة بنجاح!', pts);
+                renderAct1Ideas();
+            } else if(aiResult.status === 'DUPLICATE') {
+                showFeedback('act1-feedback', 'error', '🔁 هذه الفكرة مكررة أو قريبة جدًا من فكرة سابقة.');
+            } else if(aiResult.status === 'UNCLEAR') {
+                showFeedback('act1-feedback', 'warning', '⚠️ الإجابة غير واضحة. وضحي الجهاز أو النظام أكثر.');
+            } else {
+                showFeedback('act1-feedback', 'error', '❌ هذه الإجابة لا تمثل نظام مراقبة أو تحكم بوضوح. أدخلي مثالاً حقيقياً لجهاز ذكي أو نظام مراقبة.');
+            }
+        }
+
+        function renderAct1Ideas() {
+            const list = document.getElementById('act1-ideas-list');
+            if(!list) return;
+            const history = APP_STATE.history.act1;
+            if(!history || history.ideas.length === 0) {
+                list.innerHTML = '<span class="text-ccTextMuted txt-sm">لم تتم إضافة أي أفكار بعد...</span>';
+                return;
+            }
+            list.innerHTML = history.ideas.map((item, idx) => `
+                <div class="bg-ccCard border border-ccBorder px-4 py-2 rounded-lg txt-body flex items-center gap-3">
+                    <span class="text-ccGold font-bold">${idx+1}.</span> ${item.text} <span class="text-ccGreen text-sm">✓</span>
+                </div>
+            `).join('');
+        }
+
+        function finishAct1() {
+            stopTimer();
+            renderActivity(2);
+        }
+
+        // --- ACTIVITY 2: صنفي الأجهزة ---
+        const ACT2_ITEMS = [
+            { id: 1, title: "كاميرا مراقبة", correct: "يراقب فقط", hint: "هل يكتفي الجهاز بجمع معلومات، أم يستخدم المعلومات لتغيير حالة؟" },
+            { id: 2, title: "إشارة مرور ذكية", correct: "يراقب ويتحكم", hint: "هل تكتفي الإشارة بالرصد أم تغير الإضاءة لتنظيم السير؟" },
+            { id: 3, title: "إنذار دخان", correct: "يراقب فقط", hint: "يكتشف الدخان ويرسل تنبيهًا دون أن يطفئ الحريق بنفسه." },
+            { id: 4, title: "سوار لياقة", correct: "يراقب فقط", hint: "يقيس نبضات القلب والخطوات ويعرضها فقط." },
+            { id: 5, title: "باب آلي", correct: "يراقب ويتحكم", hint: "يكتشف الاقتراب ثم يفتح الباب تلقائياً." },
+            { id: 6, title: "مكيف ذكي", correct: "يراقب ويتحكم", hint: "يقيس الحرارة ويشغل أو يطفئ التبريد." }
+        ];
+
+        function renderActivity2(container) {
+            startTimer(120);
+            if(!APP_STATE.history.act2) APP_STATE.history.act2 = { index: 0, attempts: {} };
+            const st = APP_STATE.history.act2;
+            
+            if(st.index >= ACT2_ITEMS.length) {
+                container.innerHTML = `
+                    <div class="glass-card text-center slide-up">
+                        <h2 class="txt-title text-ccGold mb-4">✅ اكتمل النشاط 2</h2>
+                        <p class="txt-body text-ccTextMuted mb-8">أحسنتن في تصنيف الأجهزة بدقة بين مراقبة وتحكم.</p>
+                        <button type="button" onclick="renderActivity(3)" class="btn-huge btn-action mx-auto">الانتقال للنشاط 3 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                    </div>
+                `;
+                stopTimer();
+                return;
+            }
+            
+            const item = ACT2_ITEMS[st.index];
+            const qId = `act2_item_${item.id}`;
+            if(!st.attempts[qId]) st.attempts[qId] = 0;
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="txt-title text-ccGold">⚙️ النشاط 2: صنفي الأجهزة</h2>
+                        <span class="txt-sm text-ccBlue bg-ccCard px-4 py-2 rounded-xl border border-ccBorder">الحالة ${st.index + 1} من ${ACT2_ITEMS.length}</span>
+                    </div>
+                    <p class="txt-q mb-8">«صنفي الجهاز الآلي التالي بحسب وظيفته الأساسية.»</p>
+                    
+                    <div class="bg-ccBg p-8 rounded-2xl border-2 border-ccBorder text-center mb-8">
+                        <div class="txt-hero text-ccGold mb-2"><i class="fa-solid fa-microchip ml-3"></i> ${item.title}</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <button type="button" onclick="selectAct2Choice('يراقب فقط')" class="act2-btn btn-huge btn-outline">يراقب فقط</button>
+                        <button type="button" onclick="selectAct2Choice('يتحكم فقط')" class="act2-btn btn-huge btn-outline">يتحكم فقط</button>
+                        <button type="button" onclick="selectAct2Choice('يراقب ويتحكم')" class="act2-btn btn-huge btn-outline">يراقب ويتحكم</button>
+                    </div>
+                    
+                    <div class="flex justify-end gap-4">
+                        <button type="button" id="act2-submit" onclick="validateAct2('${item.correct}', '${item.hint}', '${qId}')" class="btn-huge btn-action" disabled>اعتماد الإجابة <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act2-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct2ChoiceVal = "";
+        function selectAct2Choice(val) {
+            selectedAct2ChoiceVal = val;
+            document.querySelectorAll('.act2-btn').forEach(b => {
+                b.classList.remove('border-ccGold', 'bg-ccCard');
+                if(b.innerText.trim() === val) {
+                    b.classList.add('border-ccGold', 'bg-ccCard');
+                }
+            });
+            const sub = document.getElementById('act2-submit');
+            if(sub) sub.disabled = false;
+        }
+
+        function validateAct2(correctVal, hint, qId) {
+            const st = APP_STATE.history.act2;
+            st.attempts[qId]++;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
+
+            if(selectedAct2ChoiceVal === correctVal) {
+                let pts = awardScore(qId, attempt, isFirstHalf);
+                showFeedback('act2-feedback', 'success', `✅ تصنيف صحيح! (${correctVal})`, pts);
+                document.getElementById('act2-submit').classList.add('hidden');
+                
+                setTimeout(() => {
+                    st.index++;
+                    selectedAct2ChoiceVal = "";
+                    renderActivity(2);
+                }, 1800);
+            } else {
+                showFeedback('act2-feedback', 'error', `❌ التصنيف غير صحيح.<br>تلميح: ${hint}`);
+                const fb = document.getElementById('act2-feedback');
+                if(fb && !document.getElementById('act2-retry-btn')) {
+                    fb.innerHTML += `<button type="button" id="act2-retry-btn" onclick="document.getElementById('act2-feedback').innerHTML=''" class="btn-outline py-2 px-6 mt-3 text-sm"><i class="fa-solid fa-rotate-right ml-2"></i> إعادة المحاولة</button>`;
+                }
+            }
+        }
+
+        // --- ACTIVITY 3: استنتجي الفرق ---
+        function renderActivity3(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act3) APP_STATE.history.act3 = { placed: {}, attempts: 0 };
+            const st = APP_STATE.history.act3;
+            
+            const words = [
+                { id: 'w1', text: 'يجمع البيانات', target: 'monitor' },
+                { id: 'w2', text: 'يعرض البيانات', target: 'monitor' },
+                { id: 'w3', text: 'يرسل البيانات', target: 'monitor' },
+                { id: 'w4', text: 'يتخذ قرارًا', target: 'control' },
+                { id: 'w5', text: 'يصدر أمرًا', target: 'control' },
+                { id: 'w6', text: 'يغيّر حالة جهاز', target: 'control' }
+            ];
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">💡 النشاط 3: استنتجي الفرق بين المراقبة والتحكم</h2>
+                    <p class="txt-q mb-6">«وزعي البطاقات الست الآتية في القسم المناسب:</p>
+                    
+                    <div id="act3-bank" class="flex flex-wrap gap-4 p-4 bg-ccBg rounded-xl border border-ccBorder mb-6 min-h-[70px]">
+                        ${words.filter(w => !st.placed[w.id]).map(w => `
+                            <button type="button" onclick="selectAct3Word('${w.id}')" id="word-${w.id}" class="act3-word-btn btn-outline py-2 px-4 txt-body bg-ccCard hover:border-ccBlue">${w.text}</button>
+                        `).join('')}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="glass-card border-ccBlue p-4 flex flex-col min-h-[220px]">
+                            <h3 class="txt-title text-ccBlue mb-4 text-center">👁️ نظام المراقبة</h3>
+                            <div id="box-monitor" class="flex flex-wrap gap-3 flex-grow p-3 bg-ccBg rounded-xl border border-ccBorder items-start">
+                                ${words.filter(w => st.placed[w.id] === 'monitor').map(w => `
+                                    <span onclick="returnAct3Word('${w.id}')" class="bg-ccCard border border-ccBlue px-3 py-2 rounded-lg txt-body cursor-pointer hover:bg-ccRed hover:border-ccRed transition-colors">${w.text} ✕</span>
+                                `).join('')}
+                            </div>
+                            <button type="button" onclick="placeSelectedTo('monitor')" class="btn-outline py-2 mt-3 text-sm border-ccBlue text-ccBlue">ضع المختارة هنا</button>
+                        </div>
+
+                        <div class="glass-card border-ccGold p-4 flex flex-col min-h-[220px]">
+                            <h3 class="txt-title text-ccGold mb-4 text-center">⚙️ نظام التحكم</h3>
+                            <div id="box-control" class="flex flex-wrap gap-3 flex-grow p-3 bg-ccBg rounded-xl border border-ccBorder items-start">
+                                ${words.filter(w => st.placed[w.id] === 'control').map(w => `
+                                    <span onclick="returnAct3Word('${w.id}')" class="bg-ccCard border border-ccGold px-3 py-2 rounded-lg txt-body cursor-pointer hover:bg-ccRed hover:border-ccRed transition-colors">${w.text} ✕</span>
+                                `).join('')}
+                            </div>
+                            <button type="button" onclick="placeSelectedTo('control')" class="btn-outline py-2 mt-3 text-sm border-ccGold text-ccGold">ضع المختارة هنا</button>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-4">
+                        <button type="button" id="act3-submit" onclick="validateAct3()" class="btn-huge btn-action" ${Object.keys(st.placed).length < 6 ? 'disabled' : ''}>اعتماد التصنيف <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+
+                    <div id="act3-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let currentSelectedWordId = null;
+        function selectAct3Word(id) {
+            currentSelectedWordId = id;
+            document.querySelectorAll('.act3-word-btn').forEach(b => b.classList.remove('border-ccGold', 'bg-ccBg'));
+            const btn = document.getElementById(`word-${id}`);
+            if(btn) btn.classList.add('border-ccGold', 'bg-ccBg');
+        }
+
+        function placeSelectedTo(boxKey) {
+            if(!currentSelectedWordId) return;
+            APP_STATE.history.act3.placed[currentSelectedWordId] = boxKey;
+            currentSelectedWordId = null;
+            renderActivity(3);
+        }
+
+        function returnAct3Word(id) {
+            delete APP_STATE.history.act3.placed[id];
+            renderActivity(3);
+        }
+
+        function validateAct3() {
+            const st = APP_STATE.history.act3;
+            st.attempts = (st.attempts || 0) + 1;
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
+            const qId = 'act3_classification';
+
+            const correctMap = { w1: 'monitor', w2: 'monitor', w3: 'monitor', w4: 'control', w5: 'control', w6: 'control' };
+            let allCorrect = true;
+            for(let id in correctMap) {
+                if(st.placed[id] !== correctMap[id]) allCorrect = false;
+            }
+
+            if(allCorrect) {
+                let pts = awardScore(qId, st.attempts, isFirstHalf);
+                showFeedback('act3-feedback', 'success', '✅ استنتاج صحيح! نظام المراقبة يجمع أو يعرض أو يرسل، أما التحكم فيتخذ قراراً ويصدر أمراً يغير حالة النظام.', pts);
+                
+                const fb = document.getElementById('act3-feedback');
+                fb.innerHTML += `
+                    <div class="mt-4 p-4 bg-ccBg rounded-xl border border-ccBorder text-center txt-body">
+                        مستشعر &rarr; بيانات &rarr; وحدة تحكم &rarr; قرار &rarr; إجراء
+                    </div>
+                    <button type="button" onclick="goToNextActivity()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 4 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                `;
+                document.getElementById('act3-submit').classList.add('hidden');
+            } else {
+                showFeedback('act3-feedback', 'error', '❌ يوجد تصنيف يحتاج إلى مراجعة. أي الوظائف تكتفي بجمع المعلومات؟ وأيها يؤدي إلى قرار أو إجراء؟');
+            }
+        }
+
+        // --- ACTIVITY 4: الصندوق الأسود ---
+        function renderActivity4(container) {
+            startTimer(45);
+            if(!APP_STATE.history.act4) APP_STATE.history.act4 = { attempts: 0 };
+            
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">⬛ النشاط 4: الصندوق الأسود</h2>
+                    <p class="txt-q mb-6">«تأملي البيانات الآتية الخارجة من النظام، ثم استنتجي القاعدة:</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">21°C &rarr; إيقاف</div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">22°C &rarr; إيقاف</div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">26°C &rarr; تشغيل</div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">28°C &rarr; تشغيل</div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-6">
+                        <label class="txt-q text-ccTextMain block">ما القاعدة التي يعمل النظام بناء عليها؟</label>
+                        <div class="flex flex-col gap-3">
+                            <button type="button" onclick="selectAct4Choice('greater', this)" class="act4-btn btn-huge btn-outline text-right">إذا كانت درجة الحرارة أكبر من 22°C ← تشغيل</button>
+                            <button type="button" onclick="selectAct4Choice('less', this)" class="act4-btn btn-huge btn-outline text-right">إذا كانت درجة الحرارة أقل من 22°C ← تشغيل</button>
+                            <button type="button" onclick="selectAct4Choice('equal', this)" class="act4-btn btn-huge btn-outline text-right">إذا كانت تساوي 26°C فقط ← تشغيل</button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" id="act4-submit" onclick="validateAct4()" class="btn-huge btn-action" disabled>اعتماد القاعدة <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act4-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct4Val = "";
+        function selectAct4Choice(val, btn) {
+            selectedAct4Val = val;
+            document.querySelectorAll('.act4-btn').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+            const sub = document.getElementById('act4-submit');
+            if(sub) sub.disabled = false;
+        }
+
+        function validateAct4() {
+            const st = APP_STATE.history.act4;
+            st.attempts++;
+            const isFirstHalf = APP_STATE.timerSeconds > 22;
+            const qId = 'act4_blackbox';
+
+            if(selectedAct4Val === 'greater') {
+                let pts = awardScore(qId, st.attempts, isFirstHalf);
+                showFeedback('act4-feedback', 'success', '✅ استنتاج صحيح! عندما تتجاوز الحرارة 22°C يبدأ التبريد بالعمل (26 > 22 و 28 > 22).', pts);
+                const fb = document.getElementById('act4-feedback');
+                fb.innerHTML += `<button type="button" onclick="goToNextActivity()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 5 <i class="fa-solid fa-arrow-left ml-2"></i></button>`;
+                document.getElementById('act4-submit').classList.add('hidden');
+            } else {
+                showFeedback('act4-feedback', 'error', '❌ راجعي العلاقة بين درجة الحرارة وحالة النظام. انظري متى يتغير النظام من إيقاف إلى تشغيل.');
+            }
+        }
+
+        // --- ACTIVITY 5: مفتوح أم مغلق؟ ---
+        const ACT5_CASES = [
+            { id: 1, title: "مروحة كهربائية بسرعة ثابتة", correctType: "مفتوح", correctReason: "لا تقيس النتيجة لتعديل السرعة" },
+            { id: 2, title: "مصعد يتوقف عند وجود عائق في الباب", correctType: "مغلق", correctReason: "يستخدم مستشعرًا ويغير القرار حسب القياس" },
+            { id: 3, title: "إضاءة شارع تعمل بمؤقت زمني فقط", correctType: "مفتوح", correctReason: "تعتمد على الوقت دون قياس النتيجة" },
+            { id: 4, title: "نظام مراقبة ضغط الإطارات وتنبيه السائق", correctType: "مفتوح", correctReason: "يقيس ويبلغ السائق ولا ينفذ تصحيحاً آلياً للضغط" }
+        ];
+
+        function renderActivity5(container) {
+            startTimer(120);
+            if(!APP_STATE.history.act5) APP_STATE.history.act5 = { index: 0, attempts: {} };
+            const st = APP_STATE.history.act5;
+
+            if(st.index >= ACT5_CASES.length) {
+                container.innerHTML = `
+                    <div class="glass-card text-center slide-up">
+                        <h2 class="txt-title text-ccGold mb-4">✅ اكتمل النشاط 5</h2>
+                        <p class="txt-body text-ccTextMuted mb-8">مفّرقتِ ببراعة بين الأنظمة المفتوحة والأنظمة المغلقة.</p>
+                        <button type="button" onclick="renderActivity(6)" class="btn-huge btn-action mx-auto">الانتقال للنشاط 6 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                    </div>
+                `;
+                stopTimer();
+                return;
+            }
+
+            const item = ACT5_CASES[st.index];
+            const qId = `act5_case_${item.id}`;
+            if(!st.attempts[qId]) st.attempts[qId] = 0;
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="txt-title text-ccGold">🔄 النشاط 5: مفتوح أم مغلق؟</h2>
+                        <span class="txt-sm text-ccBlue bg-ccCard px-4 py-2 rounded-xl border border-ccBorder">الحالة ${st.index + 1} من ${ACT5_CASES.length}</span>
+                    </div>
+                    
+                    <div class="bg-ccBg p-6 rounded-2xl border border-ccBorder mb-6">
+                        <div class="txt-q text-ccGold mb-2">${item.title}</div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-6">
+                        <label class="txt-sm font-bold text-ccTextMain block">نوع النظام:</label>
+                        <div class="flex gap-4">
+                            <button type="button" onclick="selectAct5Type('مفتوح')" class="act5-type-btn btn-huge btn-outline flex-1">نظام مفتوح</button>
+                            <button type="button" onclick="selectAct5Type('مغلق')" class="act5-type-btn btn-huge btn-outline flex-1">نظام مغلق</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <label class="txt-sm font-bold text-ccTextMain block">السبب العلمي:</label>
+                        <input type="text" id="act5-reason-input" class="input-lg" placeholder="اكتبي السبب باختصار..." autocomplete="off">
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" onclick="validateAct5('${item.correctType}', '${item.correctReason}', '${qId}')" class="btn-huge btn-action">اعتماد الإجابة والسبب <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act5-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct5TypeVal = "";
+        function selectAct5Type(val) {
+            selectedAct5TypeVal = val;
+            document.querySelectorAll('.act5-type-btn').forEach(b => {
+                b.classList.remove('border-ccGold', 'bg-ccCard');
+                if(b.innerText.includes(val)) b.classList.add('border-ccGold', 'bg-ccCard');
+            });
+        }
+
+        function validateAct5(correctType, correctReason, qId) {
+            const st = APP_STATE.history.act5;
+            st.attempts[qId]++;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 15;
+            const reasonInput = document.getElementById('act5-reason-input');
+            const reasonVal = reasonInput ? reasonInput.value.trim().toLowerCase() : "";
+
+            if(selectedAct5TypeVal !== correctType) {
+                showFeedback('act5-feedback', 'error', '❌ نوع النظام غير صحيح. تذكري: النظام المفتوح لا يقيس النتيجة لتعديل قراره.');
+                return;
+            }
+
+            if(!reasonVal || reasonVal.length < 3) {
+                showFeedback('act5-feedback', 'warning', '⚠️ النوع صحيح، لكن يرجى كتابة السبب العلمي بوضوح.');
+                return;
+            }
+
+            let pts = awardScore(qId, attempt, isFirstHalf);
+            showFeedback('act5-feedback', 'success', `✅ إجابة صحيحة ومكتملة!`, pts);
+            
+            setTimeout(() => {
+                st.index++;
+                selectedAct5TypeVal = "";
+                renderActivity(5);
+            }, 1800);
+        }
+
+        // --- ACTIVITY 6: أي المخططين يمثل نظامًا مغلقًا؟ ---
+        function renderActivity6(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act6) APP_STATE.history.act6 = { attempts: 0 };
+            
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">🔁 النشاط 6: أي المخططين يمثل نظامًا مغلقًا؟</h2>
+                    <p class="txt-q mb-6">«حددّي المخطط الذي يعبر عن نظام تحكم مغلق وذكري الدليل.»</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div onclick="selectAct6Chart('A', this)" id="chart-A" class="chart-card glass-card border-ccBorder p-6 cursor-pointer hover:border-ccBlue transition-all">
+                            <h3 class="txt-body font-bold text-ccBlue mb-3">المخطط A</h3>
+                            <p class="txt-sm text-ccTextMuted">قيمة مطلوبة &rarr; مقارنة &rarr; وحدة تحكم &rarr; مكيف &rarr; حرارة &rarr; مستشعر <span class="text-ccGold font-bold">&#8634;</span> إلى المقارنة</p>
+                        </div>
+                        <div onclick="selectAct6Chart('B', this)" id="chart-B" class="chart-card glass-card border-ccBorder p-6 cursor-pointer hover:border-ccBlue transition-all">
+                            <h3 class="txt-body font-bold text-ccTextMuted mb-3">المخطط B</h3>
+                            <p class="txt-sm text-ccTextMuted">ملابس متسخة &rarr; غسيل &rarr; ملابس نظيفة</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <label class="txt-sm font-bold text-ccTextMain block">ما الدليل؟</label>
+                        <input type="text" id="act6-reason" class="input-lg" placeholder="اكتبي سبب اختيارك..." autocomplete="off">
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" onclick="validateAct6()" class="btn-huge btn-action">اعتماد الإجابة <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act6-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct6Val = "";
+        function selectAct6Chart(val, el) {
+            selectedAct6Val = val;
+            document.querySelectorAll('.chart-card').forEach(c => c.classList.remove('border-ccGold', 'bg-ccCard'));
+            el.classList.add('border-ccGold', 'bg-ccCard');
+        }
+
+        function validateAct6() {
+            const st = APP_STATE.history.act6;
+            st.attempts++;
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
+            const qId = 'act6_closed';
+            const reason = document.getElementById('act6-reason').value.trim();
+
+            if(selectedAct6Val !== 'A') {
+                showFeedback('act6-feedback', 'error', '❌ ليس هذا هو النظام المغلق. ابحثي عن المسار الذي تعود فيه معلومات النتيجة إلى وحدة التحكم.');
+                return;
+            }
+            if(!reason) {
+                showFeedback('act6-feedback', 'warning', '⚠️ المخطط صحيح، لكن يرجى كتابة الدليل.');
+                return;
+            }
+
+            let pts = awardScore(qId, st.attempts, isFirstHalf);
+            showFeedback('act6-feedback', 'success', '✅ تحليل صحيح! وجود التغذية الراجعة (إعادة القياس) يمثل نظاماً مغلقاً.', pts);
+            const fb = document.getElementById('act6-feedback');
+            fb.innerHTML += `<button type="button" onclick="goToNextActivity()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 7 <i class="fa-solid fa-arrow-left ml-2"></i></button>`;
+        }
+
+        // --- ACTIVITY 7: حصتنا كنظام تحكم ---
+        function renderActivity7(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act7) APP_STATE.history.act7 = { attempts: 0 };
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">🏫 النشاط 7: حصتنا كنظام تحكم</h2>
+                    <p class="txt-q mb-6">«فكّري في حصتنا اليوم كنظام تحكم… هل تمثل نظام تحكم مفتوحًا أم مغلقًا؟ ولماذا؟»</p>
+                    
+                    <div class="flex gap-4 mb-6">
+                        <button type="button" onclick="selectAct7Type('مفتوح', this)" class="act7-type-btn btn-huge btn-outline flex-1">نظام مفتوح</button>
+                        <button type="button" onclick="selectAct7Type('مغلق', this)" class="act7-type-btn btn-huge btn-outline flex-1">نظام مغلق</button>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <label class="txt-sm font-bold text-ccTextMain block">اربطي عناصر الحصة بعناصر النظام (الهدف، الأسئلة، إجاباتكن، قرارات المعلمة، التغذية الراجعة):</label>
+                        <textarea id="act7-reason" class="input-lg" rows="3" placeholder="اكتبي تحليلك باختصار..."></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" onclick="validateAct7()" class="btn-huge btn-action">اعتماد التحليل <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act7-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct7TypeVal = "";
+        function selectAct7Type(val, btn) {
+            selectedAct7TypeVal = val;
+            document.querySelectorAll('.act7-type-btn').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+        }
+
+        function validateAct7() {
+            const st = APP_STATE.history.act7;
+            st.attempts++;
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
+            const qId = 'act7_class_system';
+            const reason = document.getElementById('act7-reason').value.trim();
+
+            if(selectedAct7TypeVal !== 'مغلق') {
+                showFeedback('act7-feedback', 'error', '❌ ليست الإجابة الصحيحة. هل تتغير قرارات المعلمة بناءً على إجاباتكن ونتائج التقويم؟');
+                return;
+            }
+            if(!reason || reason.length < 5) {
+                showFeedback('act7-feedback', 'warning', '⚠️ النوع صحيح، لكن نحتاج إلى ذكر الدليل وتفسير التغذية الراجعة.');
+                return;
+            }
+
+            let pts = awardScore(qId, st.attempts, isFirstHalf);
+            showFeedback('act7-feedback', 'success', '✅ استنتاج رائع! الحصة نظام مغلق لأن المعلمة تستخدم إجاباتكن كبيانات وتعدل قرارات الشرح والتقويم بناءً عليها.', pts);
+            const fb = document.getElementById('act7-feedback');
+            fb.innerHTML += `<button type="button" onclick="goToNextActivity()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 8 <i class="fa-solid fa-arrow-left ml-2"></i></button>`;
+        }
+
+        // --- ACTIVITY 8: SYSTEM FAILURE ---
+        function renderActivity8(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act8) APP_STATE.history.act8 = { attempts: 0 };
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">🚨 النشاط 8: SYSTEM FAILURE - بلاغ الأعطال</h2>
+                    <p class="txt-q mb-6">«تأملي حالات الأعطال الأربع الآتية:»</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-ccCard p-4 rounded-xl border border-ccBorder txt-sm">🌡️ التبريد يعمل رغم أن المكان بارد.</div>
+                        <div class="bg-ccCard p-4 rounded-xl border border-ccBorder txt-sm">🚪 الباب الآلي لا يفتح عند الاقتراب.</div>
+                        <div class="bg-ccCard p-4 rounded-xl border border-ccBorder txt-sm">💧 الخزان يستمر بالتعبئة رغم امتلائه.</div>
+                        <div class="bg-ccCard p-4 rounded-xl border border-ccBorder txt-sm">🚨 إنذار الدخان لا يعمل رغم وجود دخان.</div>
+                    </div>
+
+                    <p class="txt-q text-ccBlue mb-4">«أي جزء من سلسلة عمل النظام نبدأ بفحصه أولًا؟»</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <button type="button" onclick="selectAct8Choice('المستشعر', this)" class="act8-btn btn-huge btn-outline">المستشعر Sensor</button>
+                        <button type="button" onclick="selectAct8Choice('البيانات', this)" class="act8-btn btn-huge btn-outline">البيانات Data</button>
+                        <button type="button" onclick="selectAct8Choice('وحدة التحكم', this)" class="act8-btn btn-huge btn-outline">وحدة التحكم Controller</button>
+                        <button type="button" onclick="selectAct8Choice('جهاز التنفيذ', this)" class="act8-btn btn-huge btn-outline">جهاز التنفيذ Actuator</button>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" id="act8-submit" onclick="validateAct8()" class="btn-huge btn-action" disabled>اعتماد نقطة البداية <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act8-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct8Val = "";
+        function selectAct8Choice(val, btn) {
+            selectedAct8Val = val;
+            document.querySelectorAll('.act8-btn').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+            const sub = document.getElementById('act8-submit');
+            if(sub) sub.disabled = false;
+        }
+
+        function validateAct8() {
+            const st = APP_STATE.history.act8;
+            st.attempts++;
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
+            const qId = 'act8_failure';
+
+            if(selectedAct8Val === 'المستشعر') {
+                let pts = awardScore(qId, st.attempts, isFirstHalf);
+                showFeedback('act8-feedback', 'success', '✅ إجابة صحيحة ومنطقية! نبدأ فحص النظام من المستشعر لأنه مصدر البيانات الأول.', pts);
+                const fb = document.getElementById('act8-feedback');
+                fb.innerHTML += `
+                    <div class="mt-4 p-4 bg-ccBg rounded-xl border border-ccBorder txt-body text-ccGold text-center">
+                        💡 القاسم المشترك في كل هذه الأنظمة هو وجود <strong>المستشعرات (Sensors)</strong>.
+                    </div>
+                    <button type="button" onclick="renderTransitionToSensorsLab()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال إلى محطة الاستعداد <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                `;
+                document.getElementById('act8-submit').classList.add('hidden');
+            } else {
+                showFeedback('act8-feedback', 'error', '❌ ليس نقطة البداية المثلى. تذكري: من أين تبدأ قراءة البيئة ودخول الإشارات إلى النظام؟');
+            }
+        }
+
+        function renderTransitionToSensorsLab() {
+            const viewport = document.getElementById('activity-viewport');
+            if(!viewport) return;
+            viewport.innerHTML = `
+                <div class="glass-card text-center slide-up max-w-3xl mx-auto my-auto">
+                    <div class="text-ccBlue text-6xl mb-6"><i class="fa-solid fa-podcast"></i></div>
+                    <h2 class="txt-title text-ccGold mb-4">محطة الإعداد لمختبر المستشعرات</h2>
+                    <p class="txt-body text-ccTextMuted mb-8 leading-relaxed">
+                        «بعد قراءة خريطة المفاهيم والاستماع للبودكاست، استعدي لمختبر المستشعرات وتحديد المستشعر الأنسب لكل موقف.»
+                    </p>
+                    <button type="button" onclick="renderActivity(9)" class="btn-huge btn-action mx-auto">دخول مختبر المستشعرات <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                </div>
+            `;
+        }
+
+        // --- ACTIVITY 9: مختبر المستشعرات ---
+        const ACT9_CASES = [
+            { id: 1, text: "🚪 فتح باب آلي عند اقتراب شخص.", correct: "تقارب", hint: "يكتشف وجود جسم قريب دون الحاجة لتلامس مادي." },
+            { id: 2, text: "💡 تشغيل الإضاءة عند دخول شخص للمكان.", correct: "حركة", hint: "يرصد حركة الأجسام في النطاق." },
+            { id: 3, text: "💨 إطلاق إنذار عند وجود دخان كثيف.", correct: "دخان", hint: "مخصص لتحسس جزيئات الدخان في الهواء." },
+            { id: 4, text: "🚗 تنبيه السائق عند انخفاض ضغط إطار السيارة.", correct: "ضغط", hint: "يقيس الضغط داخل الإطارات." },
+            { id: 5, text: "🌡️ إيقاف جهاز التدفئة عند بلوغ درجة الحرارة 22°C.", correct: "حرارة", hint: "يقيس مستوى الحرارة البيئية." }
+        ];
+
+        function renderActivity9(container) {
+            startTimer(120);
+            if(!APP_STATE.history.act9) APP_STATE.history.act9 = { index: 0, attempts: {} };
+            const st = APP_STATE.history.act9;
+
+            if(st.index >= ACT9_CASES.length) {
+                container.innerHTML = `
+                    <div class="glass-card text-center slide-up">
+                        <h2 class="txt-title text-ccGold mb-4">✅ اكتمل مختبر المستشعرات (النشاط 9)</h2>
+                        <div class="bg-ccBg p-6 rounded-xl border border-ccBorder text-right space-y-2 mb-8 txt-body">
+                            <div>• التقارب &larr; جسم قريب دون تلامس</div>
+                            <div>• الحركة &larr; رصد الحركة</div>
+                            <div>• الدخان &larr; تحسس الدخان</div>
+                            <div>• الضغط &larr; قياس الضغط</div>
+                            <div>• الحرارة &larr; قياس درجة الحرارة</div>
+                            <div>• اللمس &larr; تلامس مباشر</div>
+                        </div>
+                        <button type="button" onclick="renderActivity(10)" class="btn-huge btn-action mx-auto">الانتقال للنشاط 10 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                    </div>
+                `;
+                stopTimer();
+                return;
+            }
+
+            const item = ACT9_CASES[st.index];
+            const qId = `act9_case_${item.id}`;
+            if(!st.attempts[qId]) st.attempts[qId] = 0;
+
+            const sensors = [
+                { key: "حرارة", label: "🌡️ حرارة" },
+                { key: "حركة", label: "🕺 حركة" },
+                { key: "دخان", label: "💨 دخان" },
+                { key: "ضغط", label: "⚖️ ضغط" },
+                { key: "تقارب", label: "🤏 تقارب" },
+                { key: "لمس", label: "👆 لمس" }
+            ];
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="txt-title text-ccGold">🧪 النشاط 9: مختبر المستشعرات</h2>
+                        <span class="txt-sm text-ccBlue bg-ccCard px-4 py-2 rounded-xl border border-ccBorder">الحالة ${st.index + 1} من 5</span>
+                    </div>
+                    
+                    <div class="bg-ccBg p-6 rounded-2xl border border-ccBorder mb-6 text-center">
+                        <div class="txt-q text-ccTextMain">${item.text}</div>
+                    </div>
+                    
+                    <p class="txt-sm text-ccTextMuted mb-4">اختر المستشعر الأنسب للحالة:</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                        ${sensors.map(s => `
+                            <button type="button" onclick="selectAct9Sensor('${s.key}')" class="act9-btn btn-huge btn-outline">${s.label}</button>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" id="act9-submit" onclick="validateAct9('${item.correct}', '${item.hint}', '${qId}')" class="btn-huge btn-action" disabled>اعتماد المستشعر <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act9-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct9SensorVal = "";
+        function selectAct9Sensor(val) {
+            selectedAct9SensorVal = val;
+            document.querySelectorAll('.act9-btn').forEach(b => {
+                b.classList.remove('border-ccGold', 'bg-ccCard');
+                if(b.innerText.includes(val)) b.classList.add('border-ccGold', 'bg-ccCard');
+            });
+            const sub = document.getElementById('act9-submit');
+            if(sub) sub.disabled = false;
+        }
+
+        function validateAct9(correctVal, hint, qId) {
+            const st = APP_STATE.history.act9;
+            st.attempts[qId]++;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 15;
+
+            if(selectedAct9SensorVal === correctVal) {
+                let pts = awardScore(qId, attempt, isFirstHalf);
+                showFeedback('act9-feedback', 'success', `✅ اختيار صحيح! (${correctVal})`, pts);
+                document.getElementById('act9-submit').classList.add('hidden');
+                
+                setTimeout(() => {
+                    st.index++;
+                    selectedAct9SensorVal = "";
+                    renderActivity(9);
+                }, 1800);
+            } else {
+                showFeedback('act9-feedback', 'error', `❌ ليس المستشعر الأنسب.<br>تلميح: ${hint}`);
+            }
+        }
+
+        // --- ACTIVITY 10: تعريف المستشعر (7 عناصر ثابتة بالضبط) ---
+        const SENSOR_DEFINITION_PARTS = [
+            "المستشعر جهاز",
+            "يقيس تغيرًا",
+            "في العوامل البيئية المحيطة",
+            "مثل الضوء أو الضغط",
+            "أو درجة الحرارة أو الحركة",
+            "ثم يحوّل القياس",
+            "إلى بيانات قابلة للمعالجة"
+        ];
+
+        function renderActivity10(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act10) APP_STATE.history.act10 = { attempts: 0 };
+            
+            if(!window.shuffledAct10Parts) {
+                window.shuffledAct10Parts = [...SENSOR_DEFINITION_PARTS].sort(() => Math.random() - 0.5);
+            }
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">🧩 النشاط 10: استنتجي تعريف المستشعر</h2>
+                    <p class="txt-q mb-6">«رتّبي المقاطع السبعة لتكوّني تعريفًا علميًا صحيحًا للمستشعر.»</p>
+                    
+                    <div id="act10-dropzone" class="min-h-[100px] bg-ccBg border-2 border-ccBlue rounded-xl p-6 flex flex-wrap gap-3 items-center mb-6">
+                        <span class="text-ccTextMuted txt-sm w-full text-center" id="act10-placeholder">انقري على المقاطع بالأسفل لترتيبها هنا بالترتيب الصحيح...</span>
+                    </div>
+
+                    <div class="flex flex-wrap justify-center gap-3 mb-8" id="act10-bank">
+                        ${window.shuffledAct10Parts.map(part => `
+                            <button type="button" onclick="moveAct10Part(this)" class="btn-outline px-4 py-3 rounded-xl txt-body bg-ccCard hover:border-ccBlue">${part}</button>
+                        `).join('')}
+                    </div>
+
+                    <div class="flex justify-end gap-4">
+                        <button type="button" onclick="resetAct10()" class="btn-outline py-2 px-6 txt-sm"><i class="fa-solid fa-rotate-right ml-2"></i> إعادة الترتيب</button>
+                        <button type="button" id="act10-submit" onclick="validateAct10()" class="btn-huge btn-action" disabled>اعتماد التعريف <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+
+                    <div id="act10-feedback" class="mt-4"></div>
+                </div>
+            `;
+            checkAct10State();
+        }
+
+        function moveAct10Part(btn) {
+            const dropzone = document.getElementById('act10-dropzone');
+            const bank = document.getElementById('act10-bank');
+            const placeholder = document.getElementById('act10-placeholder');
+            if(placeholder) placeholder.style.display = 'none';
+
+            if(btn.parentElement.id === 'act10-bank') {
+                dropzone.appendChild(btn);
+                btn.classList.add('border-ccBlue', 'text-ccBlue');
+            } else {
+                bank.appendChild(btn);
+                btn.classList.remove('border-ccBlue', 'text-ccBlue');
+                if(dropzone.querySelectorAll('button').length === 0 && placeholder) {
+                    placeholder.style.display = 'block';
+                }
+            }
+            checkAct10State();
+        }
+
+        function checkAct10State() {
+            const dropzone = document.getElementById('act10-dropzone');
+            const sub = document.getElementById('act10-submit');
+            if(!dropzone || !sub) return;
+            const count = dropzone.querySelectorAll('button').length;
+            sub.disabled = (count !== 7);
+        }
+
+        function resetAct10() {
+            window.shuffledAct10Parts = [...SENSOR_DEFINITION_PARTS].sort(() => Math.random() - 0.5);
+            renderActivity(10);
+        }
+
+        function validateAct10() {
+            const st = APP_STATE.history.act10;
+            st.attempts = (st.attempts || 0) + 1;
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
+            const qId = 'act10_definition';
+
+            const dropzone = document.getElementById('act10-dropzone');
+            const chosen = Array.from(dropzone.querySelectorAll('button')).map(b => b.innerText.trim());
+
+            let isExact = true;
+            for(let i=0; i<7; i++) {
+                if(chosen[i] !== SENSOR_DEFINITION_PARTS[i]) {
+                    isExact = false;
+                    break;
+                }
+            }
+
+            if(isExact) {
+                let pts = awardScore(qId, st.attempts, isFirstHalf);
+                showFeedback('act10-feedback', 'success', '✅ تعريف صحيح تماماً! المستشعر يقيس التغير ثم يحول القياس إلى بيانات.', pts);
+                const fb = document.getElementById('act10-feedback');
+                fb.innerHTML += `
+                    <div class="mt-4 p-4 bg-ccBg rounded-xl border border-ccBorder txt-sm text-ccGold text-center">
+                        🔬 صياغة علمية مهمة: المستشعر <strong>«يقيس»</strong> ثم يرسل/يحول القياس إلى <strong>«بيانات»</strong>، ولا نقول فقط «يشعر».
+                    </div>
+                    <button type="button" onclick="goToNextActivity()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 11 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                `;
+                document.getElementById('act10-submit').classList.add('hidden');
+            } else {
+                showFeedback('act10-feedback', 'error', '❌ الترتيب غير صحيح بعد. ما الذي يفعله المستشعر أولًا؟ وماذا يحدث للقياس بعد ذلك؟');
+            }
+        }
+
+        // --- ACTIVITY 11: ضغط شبكة المياه (6 مراحل متسلسلة) ---
+        function renderActivity11(container) {
+            startTimer(120);
+            if(!APP_STATE.history.act11) APP_STATE.history.act11 = { stage: 1, attempts: {} };
+            const st = APP_STATE.history.act11;
+            
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="txt-title text-ccGold">💧 النشاط 11: ضغط شبكة المياه</h2>
+                        <span id="act11-stage-indicator" class="txt-sm text-ccBlue bg-ccCard px-4 py-2 rounded-xl border border-ccBorder font-bold">المرحلة ${st.stage} من 6</span>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row gap-6 mb-8">
+                        <div class="flex-1 glass-card border-ccBlue text-center py-4">
+                            <div class="txt-sm text-ccTextMuted mb-1">الضغط المطلوب:</div>
+                            <div class="text-[36px] font-mono text-ccGold font-bold">3.0 <span class="text-xl">bar</span></div>
+                        </div>
+                        <div class="flex-1 glass-card border-ccGold text-center py-4">
+                            <div class="txt-sm text-ccTextMuted mb-1">الضغط الحالي:</div>
+                            <div class="text-[36px] font-mono text-ccBlue font-bold" id="act11-current-p">1.8 <span class="text-xl">bar</span></div>
+                        </div>
+                    </div>
+
+                    <!-- STAGE 1 -->
+                    <div id="act11-s1" class="act11-stage ${st.stage === 1 ? '' : 'hidden'} space-y-4">
+                        <p class="txt-q">«ما الكمية الفيزيائية التي يقيسها المستشعر في هذا النظام؟»</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <button type="button" onclick="checkAct11Stage1('الضغط', this)" class="btn-huge btn-outline">الضغط</button>
+                            <button type="button" onclick="checkAct11Stage1('درجة الحرارة', this)" class="btn-huge btn-outline">درجة الحرارة</button>
+                            <button type="button" onclick="checkAct11Stage1('الحركة', this)" class="btn-huge btn-outline">الحركة</button>
+                            <button type="button" onclick="checkAct11Stage1('الإضاءة', this)" class="btn-huge btn-outline">الإضاءة</button>
+                        </div>
+                        <div id="act11-s1-fb"></div>
+                    </div>
+
+                    <!-- STAGE 2 -->
+                    <div id="act11-s2" class="act11-stage ${st.stage === 2 ? '' : 'hidden'} space-y-4">
+                        <p class="txt-q">«هل مستشعر الضغط هو الذي أمر بتشغيل المضخة؟»</p>
+                        <div class="flex gap-4 max-w-md">
+                            <button type="button" onclick="checkAct11Stage2('نعم', this)" class="btn-huge btn-outline flex-1">نعم</button>
+                            <button type="button" onclick="checkAct11Stage2('لا', this)" class="btn-huge btn-outline flex-1">لا</button>
+                        </div>
+                        <div id="act11-s2-content" class="hidden mt-4 p-6 bg-ccBg rounded-xl border border-ccBorder space-y-3">
+                            <p class="txt-body text-ccGreen font-bold">✅ صحيح</p>
+                            <p class="txt-body">📡 <strong>المستشعر:</strong> يقيس ويرسل البيانات فقط.</p>
+                            <p class="txt-body">🧠 <strong>وحدة التحكم:</strong> تقارن وتتخذ القرار.</p>
+                            <p class="txt-body">⚙️ <strong>المضخة:</strong> تنفذ القرار.</p>
+                            <button type="button" onclick="advanceAct11Stage(3)" class="btn-huge btn-action mt-4">المرحلة التالية (3) <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                        </div>
+                        <div id="act11-s2-fb"></div>
+                    </div>
+
+                    <!-- STAGE 3 -->
+                    <div id="act11-s3" class="act11-stage ${st.stage === 3 ? '' : 'hidden'} space-y-4">
+                        <p class="txt-q">المطلوب = 3 bar | الحالي = 1.8 bar</p>
+                        <p class="txt-q text-ccGold">«ما القرار المناسب لوحدة التحكم ولماذا؟»</p>
+                        <div class="flex gap-4">
+                            <button type="button" onclick="selectAct11Dec('تشغيل المضخة', this)" class="act11-dec btn-huge btn-outline flex-1">تشغيل المضخة</button>
+                            <button type="button" onclick="selectAct11Dec('إيقاف المضخة', this)" class="act11-dec btn-huge btn-outline flex-1">إيقاف المضخة</button>
+                        </div>
+                        <div id="act11-reason-box" class="hidden mt-4 pt-4 border-t border-ccBorder space-y-3">
+                            <p class="txt-body font-bold">اختر السبب:</p>
+                            <div class="flex flex-col gap-3">
+                                <button type="button" onclick="selectAct11Reas('لأن 1.8 < 3', this)" class="act11-reas btn-huge btn-outline text-right">لأن 1.8 &lt; 3</button>
+                                <button type="button" onclick="selectAct11Reas('لأن 1.8 > 3', this)" class="act11-reas btn-huge btn-outline text-right">لأن 1.8 &gt; 3</button>
+                            </div>
+                            <button type="button" onclick="validateAct11Stage3()" class="btn-huge btn-action mt-3">اعتماد القرار والسبب <i class="fa-solid fa-check ml-2"></i></button>
+                        </div>
+                        <div id="act11-s3-fb"></div>
+                    </div>
+
+                    <!-- STAGE 4 -->
+                    <div id="act11-s4" class="act11-stage ${st.stage === 4 ? '' : 'hidden'} text-center space-y-6">
+                        <h3 class="txt-title text-ccGold">⚙️ محاكاة عمل المضخة ورفع الضغط تدريجياً</h3>
+                        <div class="text-[60px] font-mono text-ccBlue font-bold" id="act11-sim-display">1.8 bar</div>
+                        <div id="act11-sim-controls">
+                            <button type="button" onclick="runAct11Simulation()" class="btn-huge btn-action px-10 mx-auto">تشغيل المحاكاة الآن <i class="fa-solid fa-play ml-2"></i></button>
+                        </div>
+                        <div id="act11-s4-fb"></div>
+                    </div>
+
+                    <!-- STAGE 5 -->
+                    <div id="act11-s5" class="act11-stage ${st.stage === 5 ? '' : 'hidden'} space-y-4">
+                        <p class="txt-q">«وصل الضغط إلى 3 bar. ماذا يجب أن تفعل وحدة التحكم الآن؟»</p>
+                        <div class="flex gap-4">
+                            <button type="button" onclick="checkAct11Stage5('تشغيل', this)" class="btn-huge btn-outline flex-1">تستمر في تشغيل المضخة</button>
+                            <button type="button" onclick="checkAct11Stage5('توقف المضخة', this)" class="btn-huge btn-outline flex-1">توقف المضخة</button>
+                        </div>
+                        <div id="act11-s5-fb"></div>
+                    </div>
+
+                    <!-- STAGE 6 -->
+                    <div id="act11-s6" class="act11-stage ${st.stage === 6 ? '' : 'hidden'} space-y-6">
+                        <h3 class="txt-title text-ccGold text-center">🔄 دورة نظام التحكم المغلق والتغذية الراجعة</h3>
+                        <div class="p-6 bg-ccBg rounded-xl border border-ccBorder txt-body text-center leading-loose">
+                            ضغط الشبكة &rarr; المستشعر &rarr; البيانات &rarr; وحدة التحكم &rarr; القرار &rarr; المضخة &rarr; تغير الضغط &rarr; <strong class="text-ccGreen">إعادة القياس (Feedback ↺)</strong>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <p class="txt-sm font-bold mb-2">1. لماذا يعيد النظام قياس الضغط؟</p>
+                                <select id="act11-q6-1" class="input-lg bg-ccCard">
+                                    <option value="">-- اختاري الإجابة --</option>
+                                    <option value="correct">لمعرفة أثر القرار وهل وصل الضغط إلى القيمة المطلوبة.</option>
+                                    <option value="wrong">لأن القراءة الأولى لا قيمة لها.</option>
+                                </select>
+                            </div>
+                            <div>
+                                <p class="txt-sm font-bold mb-2">2. هل النظام مفتوح أم مغلق؟</p>
+                                <select id="act11-q6-2" class="input-lg bg-ccCard" onchange="document.getElementById('act11-box-q6-3').style.display=this.value==='closed'?'block':'none'">
+                                    <option value="">-- اختاري نوع النظام --</option>
+                                    <option value="open">مفتوح</option>
+                                    <option value="closed">مغلق</option>
+                                </select>
+                            </div>
+                            <div id="act11-box-q6-3" style="display:none;" class="space-y-2">
+                                <p class="txt-sm font-bold mb-2">3. ما الدليل؟</p>
+                                <select id="act11-q6-3" class="input-lg bg-ccCard">
+                                    <option value="">-- اختاري الدليل --</option>
+                                    <option value="correct">لأنه يعيد قياس الضغط ويستخدم التغذية الراجعة لتعديل القرار.</option>
+                                    <option value="wrong">لأنه يشغل المضخة مرة واحدة فقط.</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="button" onclick="checkAct11Stage6()" class="btn-huge btn-action w-full mt-4">اعتماد الاستنتاج النهائي للانتقال للنشاط 12 <i class="fa-solid fa-check ml-2"></i></button>
+                        <div id="act11-s6-fb"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function advanceAct11Stage(targetStage) {
+            APP_STATE.history.act11.stage = targetStage;
+            renderActivity(11);
+        }
+
+        function checkAct11Stage1(val, btn) {
+            const qId = 'act11_s1';
+            if(val === 'الضغط') {
+                let pts = awardScore(qId, 1, true);
+                showFeedback('act11-s1-fb', 'success', '✅ إجابة صحيحة! مستشعر الضغط يقيس ضغط المياه في الشبكة.', pts);
+                setTimeout(() => advanceAct11Stage(2), 1500);
+            } else {
+                showFeedback('act11-s1-fb', 'error', '❌ غير صحيح. انظري إلى وحدة القياس المستخدمة: bar.');
+            }
+        }
+
+        function checkAct11Stage2(val, btn) {
+            const qId = 'act11_s2';
+            if(val === 'لا') {
+                let pts = awardScore(qId, 1, true);
+                showFeedback('act11-s2-fb', 'success', '✅ صحيح! المستشعر يقيس ويرسل البيانات فقط، ووحدة التحكم تتخذ القرار.', pts);
+                document.getElementById('act11-s2-content').classList.remove('hidden');
+            } else {
+                showFeedback('act11-s2-fb', 'error', '❌ تذكري أن المستشعر لا يصدر أوامر التشغيل بنفسه.');
+            }
+        }
+
+        let act11DecVal = "";
+        let act11ReasVal = "";
+        function selectAct11Dec(val, btn) {
+            act11DecVal = val;
+            document.querySelectorAll('.act11-dec').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+            document.getElementById('act11-reason-box').classList.remove('hidden');
+        }
+        function selectAct11Reas(val, btn) {
+            act11ReasVal = val;
+            document.querySelectorAll('.act11-reas').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+        }
+
+        function validateAct11Stage3() {
+            const qId = 'act11_s3';
+            if(act11DecVal === 'تشغيل المضخة' && act11ReasVal === 'لأن 1.8 < 3') {
+                let pts = awardScore(qId, 1, true);
+                showFeedback('act11-s3-fb', 'success', '✅ قرار وتفسير صحيحان تماماً!', pts);
+                setTimeout(() => advanceAct11Stage(4), 1800);
+            } else {
+                showFeedback('act11-s3-fb', 'error', '❌ راجعي القرار ومقارنة القيم (1.8 < 3).');
+            }
+        }
+
+        function runAct11Simulation() {
+            const display = document.getElementById('act11-sim-display');
+            const currentP = document.getElementById('act11-current-p');
+            const controls = document.getElementById('act11-sim-controls');
+            if(controls) controls.innerHTML = '<div class="text-ccBlue txt-body"><i class="fa-solid fa-spinner fa-spin ml-2"></i> جاري رفع الضغط تدريجياً...</div>';
+
+            let steps = ['1.8 bar', '2.2 bar', '2.6 bar', '3.0 bar'];
+            let nums = [1.8, 2.2, 2.6, 3.0];
+            let i = 0;
+
+            let sim = setInterval(() => {
+                i++;
+                if(i < steps.length) {
+                    if(display) display.innerText = steps[i];
+                    if(currentP) currentP.innerHTML = `${nums[i].toFixed(1)} <span class="text-xl">bar</span>`;
+                } else {
+                    clearInterval(sim);
+                    if(display) display.classList.replace('text-ccBlue', 'text-ccGreen');
+                    showFeedback('act11-s4-fb', 'success', '✅ وصل الضغط إلى القيمة المطلوبة 3.0 bar بنجاح.');
+                    setTimeout(() => advanceAct11Stage(5), 2000);
+                }
+            }, 1000);
+        }
+
+        function checkAct11Stage5(val, btn) {
+            const qId = 'act11_s5';
+            if(val === 'توقف المضخة') {
+                let pts = awardScore(qId, 1, true);
+                showFeedback('act11-s5-fb', 'success', '✅ صحيح! تم إيقاف المضخة لأن الضغط وصل المطلوب (3 = 3).', pts);
+                setTimeout(() => advanceAct11Stage(6), 1800);
+            } else {
+                showFeedback('act11-s5-fb', 'error', '❌ غير مناسب. استمرار المضخة سيتجاوز الحد الآمن.');
+            }
+        }
+
+        function checkAct11Stage6() {
+            const q1 = document.getElementById('act11-q6-1').value;
+            const q2 = document.getElementById('act11-q6-2').value;
+            const q3 = document.getElementById('act11-q6-3').value;
+
+            if(q1 === 'correct' && q2 === 'closed' && q3 === 'correct') {
+                let pts = awardScore('act11_s6', 1, true);
+                showFeedback('act11-s6-fb', 'success', '✅ استنتاج نهائي صحيح! هذا نظام تحكم مغلق يعتمد على التغذية الراجعة.', pts);
+                setTimeout(() => goToNextActivity(), 2000);
+            } else {
+                showFeedback('act11-s6-fb', 'error', '❌ بعض الإجابات غير دقيقة علمياً. راجعي دورة التغذية الراجعة والنظام المغلق.');
+            }
+        }
+
+        // --- ACTIVITY 12: هل نثق بكل قراءة؟ ---
+        function renderActivity12(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act12) APP_STATE.history.act12 = { stage: 1, attempts: 0 };
+            const st = APP_STATE.history.act12;
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">📊 النشاط 12: هل نثق بكل قراءة؟</h2>
+                    <p class="txt-q mb-6">«قرر النظام تشغيل التبريد بأقصى طاقة بناءً على قراءات المستشعرات الآتية:</p>
+                    
+                    <div class="grid grid-cols-3 gap-4 mb-6 text-center font-mono">
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder">Sensor A<br><strong class="text-ccBlue text-xl">23°C</strong></div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder">Sensor B<br><strong class="text-ccBlue text-xl">22°C</strong></div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder">Sensor C<br><strong class="text-ccRed text-xl">68°C</strong></div>
+                    </div>
+
+                    ${st.stage === 1 ? `
+                        <p class="txt-q mb-4">أي قراءة تبدو غير طبيعية؟</p>
+                        <div class="flex gap-4 mb-6">
+                            <button type="button" onclick="selectAct12Sensor('A', this)" class="act12-s-btn btn-huge btn-outline flex-1">Sensor A (23°C)</button>
+                            <button type="button" onclick="selectAct12Sensor('B', this)" class="act12-s-btn btn-huge btn-outline flex-1">Sensor B (22°C)</button>
+                            <button type="button" onclick="selectAct12Sensor('C', this)" class="act12-s-btn btn-huge btn-outline flex-1">Sensor C (68°C)</button>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="button" id="act12-sub1" onclick="validateAct12Stage1()" class="btn-huge btn-action" disabled>اعتماد الإجابة <i class="fa-solid fa-check ml-2"></i></button>
+                        </div>
+                        <div id="act12-fb1" class="mt-4"></div>
+                    ` : `
+                        <div class="space-y-4 mb-6 bg-ccBg p-6 rounded-xl border border-ccBorder">
+                            <h3 class="txt-title text-ccGold">التحقيق الرياضي</h3>
+                            <p class="txt-body"><strong>المتوسط الحسابي:</strong> (22 + 23 + 68) &divide; 3 &asymp; <span class="text-ccRed">37.7°C</span></p>
+                            <p class="txt-body"><strong>الوسيط:</strong> 22 &mdash; 23 &mdash; 68 = <span class="text-ccGreen">23°C</span></p>
+                        </div>
+                        <p class="txt-q mb-4">أي قيمة تمثل درجة حرارة الفصل بصورة أفضل في وجود القراءة الشاذة ولماذا؟</p>
+                        <div class="flex gap-4 mb-4">
+                            <button type="button" onclick="selectAct12Math('المتوسط', this)" class="act12-m-btn btn-huge btn-outline flex-1">المتوسط الحسابي</button>
+                            <button type="button" onclick="selectAct12Math('الوسيط', this)" class="act12-m-btn btn-huge btn-outline flex-1">الوسيط (23°C)</button>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="button" id="act12-sub2" onclick="validateAct12Stage2()" class="btn-huge btn-action" disabled>اعتماد التحليل <i class="fa-solid fa-check ml-2"></i></button>
+                        </div>
+                        <div id="act12-fb2" class="mt-4"></div>
+                    `}
+                </div>
+            `;
+        }
+
+        let selectedAct12SensorVal = "";
+        function selectAct12Sensor(val, btn) {
+            selectedAct12SensorVal = val;
+            document.querySelectorAll('.act12-s-btn').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+            const sub = document.getElementById('act12-sub1');
+            if(sub) sub.disabled = false;
+        }
+
+        function validateAct12Stage1() {
+            const st = APP_STATE.history.act12;
+            st.attempts++;
+            const qId = 'act12_anomaly';
+
+            if(selectedAct12SensorVal === 'C') {
+                let pts = awardScore(qId, st.attempts, true);
+                showFeedback('act12-fb1', 'success', '✅ صحيح! 68°C قراءة شاذة وبعيدة جداً عن القراءات المعتادة.', pts);
+                const fb = document.getElementById('act12-fb1');
+                fb.innerHTML += `<button type="button" onclick="APP_STATE.history.act12.stage=2; renderActivity(12);" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للتحقيق الرياضي <i class="fa-solid fa-arrow-left ml-2"></i></button>`;
+            } else {
+                showFeedback('act12-fb1', 'error', '❌ قارني القيم الثلاث مرة أخرى وابحثي عن القراءة البعيدة عن البقية.');
+            }
+        }
+
+        let selectedAct12MathVal = "";
+        function selectAct12Math(val, btn) {
+            selectedAct12MathVal = val;
+            document.querySelectorAll('.act12-m-btn').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+            const sub = document.getElementById('act12-sub2');
+            if(sub) sub.disabled = false;
+        }
+
+        function validateAct12Stage2() {
+            const qId = 'act12_math';
+            if(selectedAct12MathVal === 'الوسيط') {
+                let pts = awardScore(qId, 1, true);
+                showFeedback('act12-fb2', 'success', '✅ تحليل سليم! الوسيط يمثل الواقع بشكل أفضل لأن القراءة الشاذة رفعت المتوسط بشكل مضلل.', pts);
+                const fb = document.getElementById('act12-fb2');
+                fb.innerHTML += `
+                    <div class="mt-4 p-4 bg-ccBg rounded-xl border border-ccBorder text-ccGold txt-sm text-center">
+                        💡 جودة البيانات &larr; جودة القرار. لا نثق بكل قراءة تلقائياً.
+                    </div>
+                    <button type="button" onclick="goToNextActivity()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 13 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                `;
+            } else {
+                showFeedback('act12-fb2', 'error', '❌ المتوسط تأثر بشدة بالقراءة الشاذة. فكري في القيمة الأكثر تمثيلاً.');
+            }
+        }
+
+        // --- ACTIVITY 13: DATA LOST ---
+        function renderActivity13(container) {
+            startTimer(60);
+            if(!APP_STATE.history.act13) APP_STATE.history.act13 = { attempts: 0 };
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">⚠️ النشاط 13: DATA LOST</h2>
+                    <p class="txt-q mb-6">«تأملي السجل الزمني لقراءات المستشعر:</p>
+                    
+                    <div class="grid grid-cols-3 gap-4 mb-6 text-center font-mono text-xl">
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder">10:00 &rarr; 24°C</div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder">10:01 &rarr; 27°C</div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-ccRed">10:02 &rarr; ؟ (مفقودة)</div>
+                    </div>
+
+                    <p class="txt-sm text-ccTextMuted mb-4">الحد الأعلى الآمن للحرارة: 28°C</p>
+                    <p class="txt-q mb-4">ما القرار الأنسب الآن؟</p>
+                    
+                    <div class="flex flex-col gap-3 mb-6">
+                        <button type="button" onclick="selectAct13Choice('cool', this)" class="act13-btn btn-huge btn-outline text-right">تشغيل التبريد فورًا بناءً على تصاعد القراءات</button>
+                        <button type="button" onclick="selectAct13Choice('check', this)" class="act13-btn btn-huge btn-outline text-right">التحقق من القراءة الحالية بسرعة قبل اتخاذ القرار</button>
+                        <button type="button" onclick="selectAct13Choice('ignore', this)" class="act13-btn btn-huge btn-outline text-right">تجاهل التنبيه كلياً</button>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button type="button" id="act13-submit" onclick="validateAct13()" class="btn-huge btn-action" disabled>اعتماد القرار <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act13-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        let selectedAct13Val = "";
+        function selectAct13Choice(val, btn) {
+            selectedAct13Val = val;
+            document.querySelectorAll('.act13-btn').forEach(b => b.classList.remove('border-ccGold', 'bg-ccCard'));
+            btn.classList.add('border-ccGold', 'bg-ccCard');
+            const sub = document.getElementById('act13-submit');
+            if(sub) sub.disabled = false;
+        }
+
+        function validateAct13() {
+            const st = APP_STATE.history.act13;
+            st.attempts++;
+            const qId = 'act13_datalost';
+
+            if(selectedAct13Val === 'check') {
+                let pts = awardScore(qId, st.attempts, true);
+                showFeedback('act13-feedback', 'success', '✅ قرار مناسب جداً! لا يمكن اتخاذ قرار موثوق عندما تكون البيانات ناقصة.', pts);
+                const fb = document.getElementById('act13-feedback');
+                fb.innerHTML += `
+                    <div class="mt-4 p-4 bg-ccBg rounded-xl border border-ccBorder text-ccGold txt-sm text-center">
+                        💡 جودة البيانات &larr; جودة القرار. إذا كانت البيانات ناقصة أو خاطئة، فقد يكون القرار خاطئاً.
+                    </div>
+                    <button type="button" onclick="goToActivity14()" class="btn-huge btn-action mt-6 mx-auto block shadow-xl animate-bounce">الانتقال إلى النشاط 14 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+                `;
+                document.getElementById('act13-submit').classList.add('hidden');
+            } else {
+                showFeedback('act13-feedback', 'error', '❌ قرار متسرع. كيف نتخذ إجراءً والبيانات الحالية غير مكتملة؟');
+            }
+        }
+
+        function goToActivity14() {
+            renderActivity(14);
+        }
+
+        // --- ACTIVITY 14: تحدي التصميم – فصل المستقبل ---
+        function renderActivity14(container) {
+            startTimer(180);
+            if(!APP_STATE.history.act14) APP_STATE.history.act14 = { submitted: false };
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">🏫 النشاط 14: تحدي التصميم – فصل المستقبل</h2>
+                    <p class="txt-q mb-6">«صمّمي نظامًا ذكيًا يجعل الفصل أفضل من خلال اختيار مشكلة وتعبئة نموذج التصميم المنهجي:»</p>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">1. اختاري المشكلة:</label>
+                            <select id="act14-prob" class="input-lg bg-ccCard">
+                                <option value="ارتفاع الحرارة">🌡️ ارتفاع درجة الحرارة</option>
+                                <option value="هدر الإضاءة">💡 هدر الإضاءة</option>
+                                <option value="ارتفاع الضوضاء">🔊 ارتفاع الضوضاء</option>
+                                <option value="الحضور">🚪 تنظيم الحضور</option>
+                                <option value="السلامة">🔥 السلامة والطوارئ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">2. المستشعر المناسب:</label>
+                            <input type="text" id="act14-sensor" class="input-lg" placeholder="مثال: مستشعر حرارة / ضوء / صوت...">
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">3. البيانات التي سيجمعها:</label>
+                            <input type="text" id="act14-data" class="input-lg" placeholder="مثال: قراءة درجة الحرارة الحالية بالعكس...">
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">4. القيمة المطلوبة أو الشرط:</label>
+                            <input type="text" id="act14-target" class="input-lg" placeholder="مثال: أن لا تتجاوز 24°C...">
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">5. القرار الذي تتخذه وحدة التحكم:</label>
+                            <input type="text" id="act14-decision" class="input-lg" placeholder="مثال: تشغيل التبريد...">
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">6. الإجراء الذي سينفذه النظام:</label>
+                            <input type="text" id="act14-action" class="input-lg" placeholder="مثال: تفعيل مضخة التبريد...">
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">7. التغذية الراجعة (Feedback):</label>
+                            <input type="text" id="act14-fb" class="input-lg" placeholder="مثال: قياس الحرارة مرة أخرى للتاكد من انخفاضها...">
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">8. نوع النظام والسبب:</label>
+                            <input type="text" id="act14-system-type" class="input-lg" placeholder="مثال: نظام مغلق لأنه يعيد القياس...">
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end mt-8">
+                        <button type="button" onclick="submitAct14Design()" class="btn-huge btn-action">اعتماد التصميم الذكي <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act14-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        async function submitAct14Design() {
+            const prob = document.getElementById('act14-prob').value;
+            const sensor = document.getElementById('act14-sensor').value.trim();
+            const data = document.getElementById('act14-data').value.trim();
+            const target = document.getElementById('act14-target').value.trim();
+            const decision = document.getElementById('act14-decision').value.trim();
+            const action = document.getElementById('act14-action').value.trim();
+            const fb = document.getElementById('act14-fb').value.trim();
+            const sys = document.getElementById('act14-system-type').value.trim();
+
+            if(!sensor || !decision || !action || !fb) {
+                showFeedback('act14-feedback', 'warning', '⚠️ يرجى تعبئة الحقول الأساسية للتصميم (المستشعر، القرار، الإجراء، والتغذية الراجعة).');
+                return;
+            }
+
+            showFeedback('act14-feedback', 'warning', 'جارٍ تقييم جودة وترابط التصميم...');
+            const evalRes = await evaluateOpenActivityAI(`${sensor} ${data} ${decision} ${action} ${fb}`, 'design');
+            
+            const qualityScore = evalRes.score;
+            const isFirstHalf = APP_STATE.timerSeconds > 90;
+            const speedBonus = isFirstHalf ? 2 : 1;
+            const totalDesignPts = qualityScore + speedBonus;
+
+            APP_STATE.activity14Design = { prob, sensor, data, decision, action, fb, sys, qualityScore };
+            let pts = awardScore('act14_design', 1, isFirstHalf);
+            APP_STATE.score = (Number(APP_STATE.score) || 0) + (totalDesignPts - pts.total);
+
+            showFeedback('act14-feedback', 'success', `✅ تم اعتماد التصميم بنجاح! تقييم الجودة: ${qualityScore}/5 وشفافية التغذية الراجعة.`);
+            
+            const box = document.getElementById('act14-feedback');
+            box.innerHTML += `
+                <button type="button" onclick="renderActivity(15)" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 15 <i class="fa-solid fa-arrow-left ml-2"></i></button>
+            `;
+        }
+
+        // --- ACTIVITY 15: مفتشة النظام ---
+        function renderActivity15(container) {
+            startTimer(120);
+            if(!APP_STATE.history.act15) APP_STATE.history.act15 = { submitted: false };
+
+            container.innerHTML = `
+                <div class="glass-card w-full mb-6 slide-up">
+                    <h2 class="txt-title text-ccGold mb-2">🔍 النشاط 15: مفتشة النظام</h2>
+                    <p class="txt-q mb-6">«راجعي تصميم مجموعة أخرى كأنكِ مفتشة نظام: ما الخلل؟ وما اقتراح التحسين؟»</p>
+                    
+                    <div class="bg-ccBg p-6 rounded-xl border border-ccBorder mb-6 space-y-3">
+                        <h3 class="text-ccBlue font-bold txt-body">نموذج المجموعة المعروض للمراجعة (تجريبي):</h3>
+                        <p class="txt-sm"><strong>المشكلة:</strong> ارتفاع درجة الحرارة</p>
+                        <p class="txt-sm"><strong>المستشعر:</strong> مستشعر حرارة</p>
+                        <p class="txt-sm"><strong>القرار والإجراء:</strong> تشغيل التكييف</p>
+                        <p class="txt-sm"><strong>التغذية الراجعة:</strong> غير متوفرة بشكل دقيق</p>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">1. تقييم المستشعر:</label>
+                            <select id="act15-s" class="input-lg bg-ccCard">
+                                <option value="appropriate">مناسب ومبرر</option>
+                                <option value="needs_improvement">يحتاج تحسين</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">2. تقييم القرار:</label>
+                            <select id="act15-d" class="input-lg bg-ccCard">
+                                <option value="appropriate">مرتبط بالبيانات والقيمة المطلوبة</option>
+                                <option value="needs_improvement">يحتاج تحسين</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">3. تقييم التغذية الراجعة:</label>
+                            <select id="act15-f" class="input-lg bg-ccCard">
+                                <option value="appropriate">واضحة وتعدل السلوك</option>
+                                <option value="needs_improvement">تحتاج تحسين وإعادة قياس</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">4. أهم خلل تم رصده:</label>
+                            <input type="text" id="act15-flaw" class="input-lg" placeholder="اكتبي الخلل باختصار...">
+                        </div>
+                        <div>
+                            <label class="txt-sm font-bold text-ccTextMain block mb-2">5. اقتراح التحسين:</label>
+                            <input type="text" id="act15-impr" class="input-lg" placeholder="اكتبي اقتراحك لتحسين النظام...">
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end mt-8">
+                        <button type="button" onclick="submitAct15Review()" class="btn-huge btn-action">اعتماد المراجعة <i class="fa-solid fa-check ml-2"></i></button>
+                    </div>
+                    
+                    <div id="act15-feedback" class="mt-4"></div>
+                </div>
+            `;
+        }
+
+        async function submitAct15Review() {
+            const flaw = document.getElementById('act15-flaw').value.trim();
+            const impr = document.getElementById('act15-impr').value.trim();
+
+            if(!flaw || !impr) {
+                showFeedback('act15-feedback', 'warning', '⚠️ يرجى تحديد الخلل واقتراح التحسين بوضوح.');
+                return;
+            }
+
+            showFeedback('act15-feedback', 'warning', 'جارٍ تقييم جودة المراجعة الهندسية...');
+            const evalRes = await evaluateOpenActivityAI(`${flaw} ${impr}`, 'review');
+            let reviewPts = evalRes.score;
+            awardScore('act15_review', 1, APP_STATE.timerSeconds > 60);
+
+            showFeedback('act15-feedback', 'success', `✅ اكتملت مهمة مفتشة النظام بنجاح! تقييم المراجعة: ${reviewPts}/5.`);
+            
+            const box = document.getElementById('act15-feedback');
+            box.innerHTML += `
+                <button type="button" onclick="renderNationalValueScreen()" class="btn-huge btn-action mt-6 mx-auto block shadow-xl">إنهاء جميع التحديات والانتقال للختام <i class="fa-solid fa-flag-checkered ml-2"></i></button>
+            `;
+        }
+
+        // --- NATIONAL VALUE & REFLECTION SCREEN ---
+        function renderNationalValueScreen() {
+            goToScreen('activity-viewport');
+            const viewport = document.getElementById('activity-viewport');
+            if(!viewport) return;
+
+            viewport.innerHTML = `
+                <div class="glass-card max-w-3xl mx-auto my-auto text-center slide-up">
+                    <div class="text-ccGold text-6xl mb-6"><i class="fa-solid fa-shield-halved"></i></div>
+                    <h2 class="txt-title text-ccGold mb-4">🇸🇦 التقنية في خدمة الأمن والسلامة</h2>
+                    <p class="txt-body text-ccTextMuted mb-8 leading-relaxed">
+                        «تسهم أنظمة المراقبة والتحكم في دعم الأمن والسلامة، لكن الاستخدام المسؤول للتقنية يتطلب أيضًا احترام الخصوصية والمسؤولية الرقمية.»
+                    </p>
+                    <div class="bg-ccBg p-6 rounded-xl border border-ccBorder mb-8 text-right txt-body">
+                        <strong class="text-ccBlue block mb-2">سؤال تأملي للمناقشة الصفية:</strong>
+                        «كيف نوازن بين الاستفادة من التقنية الحديثة في المراقبة والتحكم وبين احترام الخصوصية؟»
+                    </div>
+                    <button type="button" onclick="finishAllChallenges()" class="btn-huge btn-action mx-auto">إنهاء المهمة وعرض شاشة الاستعادة <i class="fa-solid fa-flag-checkered ml-2"></i></button>
+                </div>
+            `;
+        }
+
+        // --- END SCREEN: SYSTEM RESTORED ---
+        async function finishAllChallenges() {
+            APP_STATE.status = "مكتمل";
+            APP_STATE.finishedAt = new Date().toISOString();
+            await syncWithBackend();
+
+            goToScreen('activity-viewport');
+            const viewport = document.getElementById('activity-viewport');
+            if(!viewport) return;
+
+            const list = await getLeaderboard();
+            const myRank = list.findIndex(i => i.leaderName === APP_STATE.leaderName) + 1;
+            const finalScoreVal = Number(APP_STATE.score) || 0;
+
+            viewport.innerHTML = `
+                <div class="glass-card w-full text-center slide-up max-w-4xl mx-auto">
+                    <div class="text-ccGreen text-6xl mb-4"><i class="fa-solid fa-circle-check"></i></div>
+                    <h1 class="txt-hero text-ccGold mb-2">SYSTEM RESTORED</h1>
+                    <h2 class="txt-title text-ccTextMain mb-6">تمت استعادة أنظمة المدرسة بنجاح</h2>
+                    
+                    <div class="bg-ccBg p-6 rounded-2xl border border-ccBorder mb-8 max-w-2xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div>
+                            <div class="text-ccTextMuted text-sm">القائدة</div>
+                            <div class="txt-body font-bold text-ccGold">${APP_STATE.leaderName}</div>
+                        </div>
+                        <div>
+                            <div class="text-ccTextMuted text-sm">مجموع النقاط</div>
+                            <div class="txt-body font-bold text-ccBlue">⭐ ${finalScoreVal}</div>
+                        </div>
+                        <div>
+                            <div class="text-ccTextMuted text-sm">الترتيب الحالي</div>
+                            <div class="txt-body font-bold text-ccGreen">🏆 #${myRank > 0 ? myRank : 1}</div>
+                        </div>
+                        <div>
+                            <div class="text-ccTextMuted text-sm">الحالة</div>
+                            <div class="txt-body font-bold text-ccGreen">🟢 مكتمل</div>
+                        </div>
+                    </div>
+
+                    <p class="txt-body text-ccTextMuted mb-8 italic">
+                        «من يقرأ البيانات جيدًا… يتخذ قرارًا أفضل. قياس دقيق &larr; قرار واعٍ &larr; تحسين مستمر.»
+                    </p>
+
+                    <div class="border-t border-ccBorder pt-8 mb-8 text-right">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="txt-title text-ccGold">🏆 لوحة إنجاز المجموعات</h3>
+                            <button type="button" onclick="finishAllChallenges()" class="btn-outline py-2 px-4 text-sm"><i class="fa-solid fa-rotate ml-2"></i> تحديث لوحة النقاط</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right border-collapse">
+                                <thead class="bg-ccBg border-b border-ccBorder text-ccTextMuted txt-sm">
+                                    <tr>
+                                        <th class="py-3 px-4">الترتيب</th>
+                                        <th class="py-3 px-4">القائدة</th>
+                                        <th class="py-3 px-4">النقاط</th>
+                                        <th class="py-3 px-4">الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-ccBorder txt-body">
+                                    ${list.map((item, idx) => {
+                                        const itemScore = Number(item.totalScore) || 0;
+                                        return `
+                                        <tr class="hover:bg-ccCard">
+                                            <td class="py-3 px-4 font-bold text-ccGold">#${idx + 1}</td>
+                                            <td class="py-3 px-4 font-bold">${item.leaderName}</td>
+                                            <td class="py-3 px-4 font-mono text-ccBlue">⭐ ${itemScore}</td>
+                                            <td class="py-3 px-4 font-bold ${item.status==='مكتمل'?'text-ccGreen':'text-ccWarning'}">${item.status}</td>
+                                        </tr>
+                                    `;}).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="goToScreen('screen-home')" class="btn-huge btn-outline mx-auto">العودة للشاشة الرئيسية <i class="fa-solid fa-house mr-2"></i></button>
+                </div>
+            `;
+        }
+
+        function toggleDevGuide() {
+            const m = document.getElementById('dev-guide-modal');
+            if(m) m.classList.toggle('hidden');
+        }
+
+        function saveBackendUrl() {
+            const inp = document.getElementById('backend-url-input');
+            if(!inp) return;
+            const val = inp.value.trim();
+            BACKEND_URL = val;
+            localStorage.setItem("cc146_backend_url", val);
+            alert("✅ تم حفظ رابط BACKEND_URL بنجاح.");
+            toggleDevGuide();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const inp = document.getElementById('backend-url-input');
+            if(inp && BACKEND_URL) inp.value = BACKEND_URL;
+        });
+    </script>
+</body>
+</html>

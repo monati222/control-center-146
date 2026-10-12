@@ -307,7 +307,18 @@ function ensureSheetSetup() {
 }
 
 function jsonOutput(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// JSONP يتجاوز مشكلة CORS بين GitHub Pages وGoogle Apps Script.
+function jsonpOutput(obj, callback) {
+  const cb = String(callback || '');
+  if (cb &amp;&amp; /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(cb)) {
+    return ContentService.createTextOutput(cb + '(' + JSON.stringify(obj) + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonOutput(obj);
 }
 
 function makeSessionId() {
@@ -325,24 +336,50 @@ function getActiveSessionId() {
   return id;
 }
 
-function doGet() {
-  ensureSheetSetup();
-  return jsonOutput({ success: true, status: 'Active', sessionId: getActiveSessionId(), ttlHours: 3 });
+function normalizeRequestData(p) {
+  p = p || {};
+  return {
+    action: String(p.action || ''),
+    sessionId: String(p.sessionId || ''),
+    leaderName: String(p.leaderName || ''),
+    totalScore: Number(p.totalScore || 0),
+    status: String(p.status || 'قيد الحل'),
+    currentActivity: Number(p.currentActivity || 1),
+    startedAt: String(p.startedAt || ''),
+    lastUpdatedAt: String(p.lastUpdatedAt || ''),
+    finishedAt: String(p.finishedAt || '')
+  };
 }
 
+function handleAction(data) {
+  const action = data.action || 'activeSession';
+  if (action === 'activeSession') return { success: true, sessionId: getActiveSessionId(), ttlHours: 3 };
+  if (action === 'newSession') return startNewSession();
+  if (action === 'sync') return syncRecord(data);
+  if (action === 'leaderboard') return getLeaderboardData();
+  if (action === 'email') return sendEmailReport();
+  return { success: false, error: 'Invalid action' };
+}
+
+function doGet(e) {
+  try {
+    ensureSheetSetup();
+    const p = (e &amp;&amp; e.parameter) || {};
+    const data = normalizeRequestData(p);
+    const result = handleAction(data);
+    return jsonpOutput(result, p.callback);
+  } catch (err) {
+    const p = (e &amp;&amp; e.parameter) || {};
+    return jsonpOutput({ success: false, error: String(err) }, p.callback);
+  }
+}
+
+// نبقي POST للتوافق والاختبار اليدوي، لكن واجهة GitHub تستخدم JSONP عبر GET.
 function doPost(e) {
   try {
     ensureSheetSetup();
-    const data = JSON.parse((e &amp;&amp; e.postData &amp;&amp; e.postData.contents) || '{}');
-    const action = data.action;
-
-    if (action === 'activeSession') return jsonOutput({ success: true, sessionId: getActiveSessionId(), ttlHours: 3 });
-    if (action === 'newSession') return jsonOutput(startNewSession());
-    if (action === 'sync') return jsonOutput(syncRecord(data));
-    if (action === 'leaderboard') return jsonOutput(getLeaderboardData());
-    if (action === 'email') return jsonOutput(sendEmailReport());
-
-    return jsonOutput({ success: false, error: 'Invalid action' });
+    const raw = JSON.parse((e &amp;&amp; e.postData &amp;&amp; e.postData.contents) || '{}');
+    return jsonOutput(handleAction(normalizeRequestData(raw)));
   } catch (err) {
     return jsonOutput({ success: false, error: String(err) });
   }
@@ -354,7 +391,7 @@ function startNewSession() {
   try {
     ensureSheetSetup();
     const lastRow = sheet.getLastRow();
-    if (lastRow &gt; 1) sheet.deleteRows(2, lastRow - 1); // حذف نتائج الجلسة السابقة فعليًا
+    if (lastRow &gt; 1) sheet.deleteRows(2, lastRow - 1);
     const newId = makeSessionId();
     PropertiesService.getScriptProperties().setProperty(ACTIVE_SESSION_KEY, newId);
     return { success: true, sessionId: newId, cleared: true };
@@ -371,12 +408,12 @@ function syncRecord(data) {
   lock.waitLock(10000);
   try {
     ensureSheetSetup();
-    // الخادم هو المرجع للجلسة الحالية؛ أي جهاز قديم ينتقل تلقائيًا للجلسة الجديدة.
     const sessionId = getActiveSessionId();
-    // إذا كان الجهاز ما زال على جلسة سابقة بعد أن بدأت المعلمة جلسة جديدة، لا ننقل نقاطه القديمة.
+
     if (data.sessionId &amp;&amp; String(data.sessionId) !== sessionId) {
       return { success: true, sessionId, resetRequired: true, totalScore: 0, currentActivity: 1, status: 'قيد الحل' };
     }
+
     const incomingScore = Math.max(0, Number(data.totalScore) || 0);
     const incomingActivity = Math.max(1, Number(data.currentActivity) || 1);
     const incomingStatus = data.status === 'مكتمل' ? 'مكتمل' : 'قيد الحل';
@@ -424,9 +461,14 @@ function getLeaderboardData() {
     const isFresh = Number.isFinite(lastUpdated) &amp;&amp; (Date.now() - lastUpdated &lt;= SESSION_TTL_MS);
     if (!isFresh) continue;
     list.push({
-      sessionId: String(rows[i][0]), leaderName: String(rows[i][1]), totalScore: Number(rows[i][2]) || 0,
-      status: String(rows[i][3] || 'قيد الحل'), currentActivity: Number(rows[i][4]) || 1,
-      startedAt: rows[i][5], lastUpdatedAt: rows[i][6], finishedAt: rows[i][7]
+      sessionId: String(rows[i][0]),
+      leaderName: String(rows[i][1]),
+      totalScore: Number(rows[i][2]) || 0,
+      status: String(rows[i][3] || 'قيد الحل'),
+      currentActivity: Number(rows[i][4]) || 1,
+      startedAt: rows[i][5],
+      lastUpdatedAt: rows[i][6],
+      finishedAt: rows[i][7]
     });
   }
 
@@ -440,7 +482,9 @@ function sendEmailReport() {
   const data = getLeaderboardData();
   let html = "&lt;div dir='rtl' style='font-family:Arial,sans-serif'&gt;&lt;h2&gt;تقرير مركز التحكم الذكي - الثانوية 146&lt;/h2&gt;";
   html += "&lt;p&gt;نتائج الجلسة الحالية فقط.&lt;/p&gt;&lt;table border='1' cellpadding='8' style='border-collapse:collapse;width:100%'&gt;&lt;tr&gt;&lt;th&gt;الترتيب&lt;/th&gt;&lt;th&gt;القائدة&lt;/th&gt;&lt;th&gt;النقاط&lt;/th&gt;&lt;th&gt;الحالة&lt;/th&gt;&lt;/tr&gt;";
-  data.leaderboard.forEach((item, idx) =&gt; { html += `&lt;tr&gt;&lt;td&gt;${idx + 1}&lt;/td&gt;&lt;td&gt;${escapeHtml(item.leaderName)}&lt;/td&gt;&lt;td&gt;${item.totalScore}&lt;/td&gt;&lt;td&gt;${escapeHtml(item.status)}&lt;/td&gt;&lt;/tr&gt;`; });
+  data.leaderboard.forEach((item, idx) =&gt; {
+    html += `&lt;tr&gt;&lt;td&gt;${idx + 1}&lt;/td&gt;&lt;td&gt;${escapeHtml(item.leaderName)}&lt;/td&gt;&lt;td&gt;${item.totalScore}&lt;/td&gt;&lt;td&gt;${escapeHtml(item.status)}&lt;/td&gt;&lt;/tr&gt;`;
+  });
   html += '&lt;/table&gt;&lt;/div&gt;';
   GmailApp.sendEmail(email, 'تقرير نتائج حصة التقنية الرقمية - مركز التحكم 146', 'يرجى عرض الرسالة بصيغة HTML.', { htmlBody: html });
   return { success: true, count: data.leaderboard.length, sessionId: data.sessionId };
@@ -616,16 +660,58 @@ function escapeHtml(value) {
         let LAST_LEADERBOARD_SOURCE = "local";
         let LAST_BACKEND_ERROR = "";
 
+        // GitHub Pages -> Apps Script: نستخدم JSONP لتجنب مشكلة CORS في المتصفح.
+        // الاسم backendPost أبقيناه حتى لا نغيّر بقية التطبيق، لكنه ينفذ الطلب عبر <script> آمن ومؤقت.
         async function backendPost(payload) {
             if (!BACKEND_URL) throw new Error("No backend URL configured");
-            const res = await fetch(BACKEND_URL, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify(payload)
+            return new Promise((resolve, reject) => {
+                const callbackName = `__cc146_cb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const script = document.createElement('script');
+                let settled = false;
+
+                const cleanup = () => {
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+                };
+
+                const timer = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    reject(new Error("انتهت مهلة الاتصال بالخادم"));
+                }, 12000);
+
+                window[callbackName] = (data) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    cleanup();
+                    if (!data || data.success === false) {
+                        reject(new Error((data && data.error) || "Backend request failed"));
+                        return;
+                    }
+                    resolve(data);
+                };
+
+                const params = new URLSearchParams();
+                Object.entries(payload || {}).forEach(([key, value]) => {
+                    if (value === undefined || value === null) return;
+                    params.set(key, String(value));
+                });
+                params.set('callback', callbackName);
+                params.set('_', String(Date.now()));
+
+                script.async = true;
+                script.src = `${BACKEND_URL}?${params.toString()}`;
+                script.onerror = () => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    cleanup();
+                    reject(new Error("تعذر الوصول إلى Google Apps Script"));
+                };
+                document.head.appendChild(script);
             });
-            const data = await res.json();
-            if(!data || data.success === false) throw new Error((data && data.error) || "Backend request failed");
-            return data;
         }
 
         async function loadActiveSessionFromBackend() {

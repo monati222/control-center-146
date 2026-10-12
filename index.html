@@ -224,7 +224,6 @@
                 <div class="flex flex-wrap gap-3">
                     <button type="button" onclick="startNewTeacherSession()" class="btn-huge btn-outline py-2 px-6 border-ccRed text-ccRed"><i class="fa-solid fa-broom-ball ml-2"></i> بدء جلسة جديدة</button>
                     <button type="button" onclick="refreshTeacherLeaderboard()" class="btn-huge btn-outline py-2 px-6"><i class="fa-solid fa-rotate ml-2"></i> تحديث النتائج</button>
-                    <button type="button" onclick="sendTeacherEmail()" class="btn-huge btn-outline py-2 px-6 border-ccBlue text-ccBlue"><i class="fa-solid fa-envelope ml-2"></i> إرسال النتائج لبريدي</button>
                     <button type="button" onclick="goToScreen('screen-home')" class="btn-huge btn-outline py-2 px-6"><i class="fa-solid fa-house ml-2"></i> خروج</button>
                 </div>
             </div>
@@ -278,11 +277,8 @@
                 <li>يحفظ التطبيق تقدم كل مجموعة محليًا لمدة <strong class="text-white">3 ساعات من آخر تحديث</strong>، ويعرض في لوحة الحصة السجلات الحديثة فقط.</li>
             </ol>
             <div class="bg-ccBg p-4 rounded-xl border border-ccBorder mb-6">
-                <label class="block text-ccGold txt-sm mb-2 font-bold">ضع رابط الـ Web App هنا:</label>
-                <div class="flex gap-3">
-                    <input type="text" id="backend-url-input" class="input-lg text-sm font-mono" placeholder="https://script.google.com/macros/s/.../exec">
-                    <button type="button" onclick="saveBackendUrl()" class="btn-huge btn-action py-2 px-6 text-sm">حفظ</button>
-                </div>
+                <div class="text-ccGreen txt-sm font-bold">✅ رابط الخادم مثبت داخل هذه النسخة</div>
+                <div class="text-ccTextMuted text-xs mt-2 break-all" dir="ltr">https://script.google.com/macros/s/AKfycbybzbqc-WbrjiZTJLuvtd1vjcmPpjGw2vz1McCWGpHdQ4KQyiHebFV5L0y3BLD9vFF1/exec</div>
             </div>
             <h4 class="txt-q text-ccBlue mb-2">كود Google Apps Script المقترح (Backend):</h4>
             <pre class="bg-ccBg p-4 rounded-xl border border-ccBorder text-xs text-ccTextMain overflow-x-auto font-mono text-left" dir="ltr">
@@ -655,19 +651,29 @@ function escapeHtml(value) {
         }
 
         // ضعي رابط Google Apps Script هنا مرة واحدة قبل رفع الملف إلى GitHub حتى تعمل لوحة جميع الأجهزة تلقائيًا.
-        const DEFAULT_BACKEND_URL = "https://script.google.com/macros/s/AKfycbxK8q5RDaFcAkQC1mciSe9CI9pgFoc9sG_cuFBwigsvbaDbjebjRBirXQ23UeIczy3D/exec";
-        let BACKEND_URL = localStorage.getItem(STORAGE_KEYS.backendUrl) || DEFAULT_BACKEND_URL;
+        const DEFAULT_BACKEND_URL = "https://script.google.com/macros/s/AKfycbybzbqc-WbrjiZTJLuvtd1vjcmPpjGw2vz1McCWGpHdQ4KQyiHebFV5L0y3BLD9vFF1/exec";
+        // استخدمي دائمًا رابط الـDeployment المضمّن في النسخة المنشورة.
+        // تجاهل أي رابط قديم محفوظ على الجهاز حتى لا يظل الموقع متصلًا بـDeployment سابق.
+        let BACKEND_URL = DEFAULT_BACKEND_URL;
+        try {
+            const savedBackend = localStorage.getItem(STORAGE_KEYS.backendUrl);
+            if (savedBackend && savedBackend !== DEFAULT_BACKEND_URL) {
+                localStorage.removeItem(STORAGE_KEYS.backendUrl);
+            }
+        } catch (_) {}
         let LAST_LEADERBOARD_SOURCE = "local";
         let LAST_BACKEND_ERROR = "";
 
-        // GitHub Pages -> Apps Script: نستخدم JSONP لتجنب مشكلة CORS في المتصفح.
-        // الاسم backendPost أبقيناه حتى لا نغيّر بقية التطبيق، لكنه ينفذ الطلب عبر <script> آمن ومؤقت.
-        async function backendPost(payload) {
-            if (!BACKEND_URL) throw new Error("No backend URL configured");
+        // اتصال ثابت مع Google Apps Script:
+        // - القراءة GET عبر JSONP لتجاوز CORS.
+        // - الكتابة POST بوضع no-cors، ثم نتحقق من النتيجة بقراءة الخادم.
+        function backendGet(payload) {
+            if (!BACKEND_URL) return Promise.reject(new Error("No backend URL configured"));
+
             return new Promise((resolve, reject) => {
-                const callbackName = `__cc146_cb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-                const script = document.createElement('script');
-                let settled = false;
+                const callbackName = `__cc146_jsonp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const script = document.createElement("script");
+                let finished = false;
 
                 const cleanup = () => {
                     if (script.parentNode) script.parentNode.removeChild(script);
@@ -675,19 +681,20 @@ function escapeHtml(value) {
                 };
 
                 const timer = setTimeout(() => {
-                    if (settled) return;
-                    settled = true;
+                    if (finished) return;
+                    finished = true;
                     cleanup();
-                    reject(new Error("انتهت مهلة الاتصال بالخادم"));
+                    reject(new Error("انتهت مهلة قراءة الخادم"));
                 }, 12000);
 
                 window[callbackName] = (data) => {
-                    if (settled) return;
-                    settled = true;
+                    if (finished) return;
+                    finished = true;
                     clearTimeout(timer);
                     cleanup();
+
                     if (!data || data.success === false) {
-                        reject(new Error((data && data.error) || "Backend request failed"));
+                        reject(new Error((data && data.error) || "Backend read failed"));
                         return;
                     }
                     resolve(data);
@@ -698,25 +705,40 @@ function escapeHtml(value) {
                     if (value === undefined || value === null) return;
                     params.set(key, String(value));
                 });
-                params.set('callback', callbackName);
-                params.set('_', String(Date.now()));
+                params.set("callback", callbackName);
+                params.set("_", String(Date.now()));
 
                 script.async = true;
                 script.src = `${BACKEND_URL}?${params.toString()}`;
                 script.onerror = () => {
-                    if (settled) return;
-                    settled = true;
+                    if (finished) return;
+                    finished = true;
                     clearTimeout(timer);
                     cleanup();
-                    reject(new Error("تعذر الوصول إلى Google Apps Script"));
+                    reject(new Error("تعذر قراءة Google Apps Script"));
                 };
                 document.head.appendChild(script);
             });
         }
 
+        async function backendWrite(payload) {
+            if (!BACKEND_URL) throw new Error("No backend URL configured");
+
+            // text/plain + no-cors = طلب بسيط لا يحتاج preflight.
+            // لا يمكن قراءة الاستجابة مباشرة، لذلك نتحقق بعدها بقراءة JSONP.
+            await fetch(BACKEND_URL, {
+                method: "POST",
+                mode: "no-cors",
+                cache: "no-store",
+                headers: { "Content-Type": "text/plain;charset=UTF-8" },
+                body: JSON.stringify(payload)
+            });
+            return true;
+        }
+
         async function loadActiveSessionFromBackend() {
             if(!BACKEND_URL) return APP_STATE.sessionId;
-            const data = await backendPost({ action: "activeSession" });
+            const data = await backendGet({ action: "activeSession" });
             if(data.sessionId) {
                 const changed = APP_STATE.sessionId && APP_STATE.sessionId !== data.sessionId;
                 APP_STATE.sessionId = data.sessionId;
@@ -730,8 +752,9 @@ function escapeHtml(value) {
         async function syncWithBackend() {
             saveLocalState();
             if (!BACKEND_URL || !APP_STATE.leaderName) return;
+
             try {
-                const data = await backendPost({
+                await backendWrite({
                     action: "sync",
                     sessionId: APP_STATE.sessionId,
                     leaderName: APP_STATE.leaderName,
@@ -742,30 +765,28 @@ function escapeHtml(value) {
                     lastUpdatedAt: APP_STATE.lastUpdatedAt,
                     finishedAt: APP_STATE.finishedAt
                 });
-                if(data.resetRequired) {
+
+                // بعد الكتابة نقرأ الجلسة الحالية فقط للتأكد أن الجهاز ليس على جلسة قديمة.
+                const sessionData = await backendGet({ action: "activeSession" });
+                if(sessionData.sessionId && sessionData.sessionId !== APP_STATE.sessionId) {
                     const currentLeader = APP_STATE.leaderName;
                     applyStoredState(createDefaultState());
-                    APP_STATE.sessionId = data.sessionId;
+                    APP_STATE.sessionId = sessionData.sessionId;
                     APP_STATE.leaderName = currentLeader;
-                    localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
+                    localStorage.setItem(STORAGE_KEYS.activeSessionId, sessionData.sessionId);
                     updateHeaderFromState();
                     saveLocalState();
+
                     const viewport = document.getElementById('activity-viewport');
                     if(viewport && !viewport.classList.contains('hidden-screen')) renderActivity(1);
-                    return;
-                }
-                if(data.sessionId && data.sessionId !== APP_STATE.sessionId) {
-                    APP_STATE.sessionId = data.sessionId;
-                    localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
-                    saveLocalState();
                 }
             } catch(e) {
-                console.warn("Backend sync offline fallback active", e);
+                console.warn("تعذر مزامنة المجموعة مع الخادم", e);
             }
         }
 
         async function fetchLeaderboardFromBackend() {
-            const data = await backendPost({ action: "leaderboard", sessionId: APP_STATE.sessionId });
+            const data = await backendGet({ action: "leaderboard", sessionId: APP_STATE.sessionId });
             if(data.sessionId && data.sessionId !== APP_STATE.sessionId) {
                 APP_STATE.sessionId = data.sessionId;
                 localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
@@ -993,33 +1014,57 @@ function escapeHtml(value) {
 
         async function startNewTeacherSession() {
             if(!BACKEND_URL) {
-                alert("⚠️ لبدء جلسة مشتركة جديدة يجب ربط Google Apps Script أولاً من إعدادات Backend.");
+                alert("⚠️ لا يوجد رابط Google Apps Script.");
                 return;
             }
-            const ok = confirm("بدء جلسة جديدة؟\n\nسيتم حذف نتائج الجلسة السابقة من لوحة النتائج وبدء الحصة من الصفر لجميع المجموعات. لا يمكن التراجع عن هذا الإجراء.");
+
+            const ok = confirm("بدء جلسة جديدة؟
+
+سيتم حذف نتائج الجلسة السابقة وبدء الحصة من الصفر لجميع المجموعات.");
             if(!ok) return;
 
             const banner = document.getElementById('teacher-status-banner');
+            const oldSessionId = APP_STATE.sessionId;
+
             try {
                 if(banner) {
                     banner.className = "mb-4 p-4 rounded-xl border border-ccWarning bg-[rgba(255,165,2,0.1)] text-ccWarning text-center txt-body";
-                    banner.textContent = "⏳ جارٍ إنشاء جلسة جديدة وحذف نتائج الجلسة السابقة...";
+                    banner.textContent = "⏳ جارٍ بدء جلسة جديدة...";
                     banner.classList.remove('hidden');
                 }
-                const data = await backendPost({ action: "newSession" });
+
+                await backendWrite({ action: "newSession" });
+
+                // نعطي Apps Script لحظة لتنفيذ الحذف وتوليد الجلسة الجديدة.
+                await new Promise(r => setTimeout(r, 900));
+
+                let data = null;
+                for(let attempt = 0; attempt < 4; attempt++) {
+                    data = await backendGet({ action: "activeSession" });
+                    if(data.sessionId && data.sessionId !== oldSessionId) break;
+                    await new Promise(r => setTimeout(r, 700));
+                }
+
+                if(!data || !data.sessionId || data.sessionId === oldSessionId) {
+                    throw new Error("تم إرسال الطلب لكن لم تتغير الجلسة على الخادم. أعيدي المحاولة.");
+                }
+
                 APP_STATE.sessionId = data.sessionId;
                 localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
                 localStorage.removeItem(STORAGE_KEYS.activeStudent);
                 localStorage.removeItem(STORAGE_KEYS.studentStates);
                 localStorage.removeItem(STORAGE_KEYS.localLeaderboard);
+
                 applyStoredState(createDefaultState());
                 APP_STATE.sessionId = data.sessionId;
                 updateResumeCard();
+
                 if(banner) {
                     banner.className = "mb-4 p-4 rounded-xl border border-ccGreen bg-[rgba(0,210,106,0.1)] text-ccGreen text-center txt-body";
-                    banner.innerHTML = `✅ بدأت جلسة جديدة بنجاح. <span class="text-ccTextMain">كل مجموعة تدخل الآن ستظهر في هذه اللوحة.</span>`;
+                    banner.innerHTML = `✅ بدأت جلسة جديدة بنجاح. <span class="text-ccTextMain">بانتظار دخول المجموعات...</span>`;
                     banner.classList.remove('hidden');
                 }
+
                 await refreshTeacherLeaderboard();
             } catch(e) {
                 if(banner) {
@@ -1086,22 +1131,6 @@ function escapeHtml(value) {
             }
         }
 
-        async function sendTeacherEmail() {
-            if(!BACKEND_URL) {
-                alert("برجاء إعداد رابط BACKEND_URL في إعدادات الربط أولاً.");
-                return;
-            }
-            try {
-                const data = await backendPost({ action: "email", sessionId: APP_STATE.sessionId });
-                if(data && data.success) {
-                    alert("✅ تم إرسال تقرير النتائج إلى بريدك الإلكتروني بنجاح.");
-                } else {
-                    alert("⚠️ تعذر الإرسال: تأكد من إعداد TEACHER_EMAIL في الـ Apps Script.");
-                }
-            } catch(e) {
-                alert("⚠️ حدث خطأ أثناء الاتصال بالخادم لإرسال البريد.");
-            }
-        }
 
         /* -------------------------------------------------------------------------- */
         /*                           TIMER & SCORING ENGINE                           */
@@ -2861,15 +2890,6 @@ function escapeHtml(value) {
             if(m) m.classList.toggle('hidden');
         }
 
-        function saveBackendUrl() {
-            const inp = document.getElementById('backend-url-input');
-            if(!inp) return;
-            const val = inp.value.trim();
-            BACKEND_URL = val;
-            localStorage.setItem(STORAGE_KEYS.backendUrl, val);
-            alert("✅ تم حفظ رابط Backend على هذا الجهاز. للنشر على كل أجهزة الطالبات ضعي الرابط أيضًا في DEFAULT_BACKEND_URL داخل ملف index.html قبل رفعه إلى GitHub.");
-            toggleDevGuide();
-        }
 
         window.addEventListener('DOMContentLoaded', async () => {
             pruneExpiredStorage();

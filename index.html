@@ -222,6 +222,7 @@
                     <p class="txt-sm text-ccTextMuted mt-1">متابعة مباشرة لدرجات وحالة المجموعات في الحصة الحالية</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
+                    <button type="button" onclick="startNewTeacherSession()" class="btn-huge btn-outline py-2 px-6 border-ccRed text-ccRed"><i class="fa-solid fa-broom-ball ml-2"></i> بدء جلسة جديدة</button>
                     <button type="button" onclick="refreshTeacherLeaderboard()" class="btn-huge btn-outline py-2 px-6"><i class="fa-solid fa-rotate ml-2"></i> تحديث النتائج</button>
                     <button type="button" onclick="sendTeacherEmail()" class="btn-huge btn-outline py-2 px-6 border-ccBlue text-ccBlue"><i class="fa-solid fa-envelope ml-2"></i> إرسال النتائج لبريدي</button>
                     <button type="button" onclick="goToScreen('screen-home')" class="btn-huge btn-outline py-2 px-6"><i class="fa-solid fa-house ml-2"></i> خروج</button>
@@ -286,9 +287,10 @@
             <h4 class="txt-q text-ccBlue mb-2">كود Google Apps Script المقترح (Backend):</h4>
             <pre class="bg-ccBg p-4 rounded-xl border border-ccBorder text-xs text-ccTextMain overflow-x-auto font-mono text-left" dir="ltr">
 const ss = SpreadsheetApp.getActiveSpreadsheet();
-const sheet = ss.getSheetByName("Leaderboard") || ss.insertSheet("Leaderboard");
-const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // تعرض لوحة الحصة السجلات النشطة خلال آخر 3 ساعات فقط
-const HEADERS = ["sessionId","leaderName","totalScore","status","currentActivity","startedAt","lastUpdatedAt","finishedAt"];
+const sheet = ss.getSheetByName('Leaderboard') || ss.insertSheet('Leaderboard');
+const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3 ساعات
+const HEADERS = ['sessionId','leaderName','totalScore','status','currentActivity','startedAt','lastUpdatedAt','finishedAt'];
+const ACTIVE_SESSION_KEY = 'CC146_ACTIVE_SESSION_ID';
 
 function ensureSheetSetup() {
   if (sheet.getLastRow() === 0) {
@@ -296,119 +298,158 @@ function ensureSheetSetup() {
     sheet.setFrozenRows(1);
     return;
   }
-  const first = String(sheet.getRange(1,1).getValue() || "");
-  if (first !== "sessionId") {
+  const first = String(sheet.getRange(1, 1).getValue() || '');
+  if (first !== 'sessionId') {
     sheet.insertRowBefore(1);
-    sheet.getRange(1,1,1,HEADERS.length).setValues([HEADERS]);
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
     sheet.setFrozenRows(1);
   }
 }
 
-ensureSheetSetup();
-
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action;
-    
-    if (action === "sync") {
-      return ContentService.createTextOutput(JSON.stringify(syncRecord(data))).setMimeType(ContentService.MimeType.JSON);
-    } else if (action === "leaderboard") {
-      return ContentService.createTextOutput(JSON.stringify(getLeaderboardData(data.sessionId))).setMimeType(ContentService.MimeType.JSON);
-    } else if (action === "email") {
-      return ContentService.createTextOutput(JSON.stringify(sendEmailReport(data.sessionId))).setMimeType(ContentService.MimeType.JSON);
-    }
-    return ContentService.createTextOutput(JSON.stringify({error: "Invalid action"})).setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
-  }
+function jsonOutput(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function doGet(e) {
-  return ContentService.createTextOutput(JSON.stringify({status: "Active"})).setMimeType(ContentService.MimeType.JSON);
+function makeSessionId() {
+  const tz = Session.getScriptTimeZone() || 'Asia/Riyadh';
+  return 'SES_' + Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmmss') + '_' + Utilities.getUuid().slice(0, 6);
 }
 
 function getActiveSessionId() {
-  const today = new Date().toISOString().split('T')[0];
-  return "SES_" + today;
+  const props = PropertiesService.getScriptProperties();
+  let id = props.getProperty(ACTIVE_SESSION_KEY);
+  if (!id) {
+    id = makeSessionId();
+    props.setProperty(ACTIVE_SESSION_KEY, id);
+  }
+  return id;
+}
+
+function doGet() {
+  ensureSheetSetup();
+  return jsonOutput({ success: true, status: 'Active', sessionId: getActiveSessionId(), ttlHours: 3 });
+}
+
+function doPost(e) {
+  try {
+    ensureSheetSetup();
+    const data = JSON.parse((e &amp;&amp; e.postData &amp;&amp; e.postData.contents) || '{}');
+    const action = data.action;
+
+    if (action === 'activeSession') return jsonOutput({ success: true, sessionId: getActiveSessionId(), ttlHours: 3 });
+    if (action === 'newSession') return jsonOutput(startNewSession());
+    if (action === 'sync') return jsonOutput(syncRecord(data));
+    if (action === 'leaderboard') return jsonOutput(getLeaderboardData());
+    if (action === 'email') return jsonOutput(sendEmailReport());
+
+    return jsonOutput({ success: false, error: 'Invalid action' });
+  } catch (err) {
+    return jsonOutput({ success: false, error: String(err) });
+  }
+}
+
+function startNewSession() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    ensureSheetSetup();
+    const lastRow = sheet.getLastRow();
+    if (lastRow &gt; 1) sheet.deleteRows(2, lastRow - 1); // حذف نتائج الجلسة السابقة فعليًا
+    const newId = makeSessionId();
+    PropertiesService.getScriptProperties().setProperty(ACTIVE_SESSION_KEY, newId);
+    return { success: true, sessionId: newId, cleared: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function syncRecord(data) {
-  const sessionId = data.sessionId || getActiveSessionId();
-  const leaderName = data.leaderName;
-  const rows = sheet.getDataRange().getValues();
-  
-  let foundRow = -1;
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === sessionId && rows[i][1] === leaderName) {
-      foundRow = i + 1;
-      break;
-    }
-  }
-  
-  const now = new Date().toISOString();
-  const incomingScore = Number(data.totalScore) || 0;
-  const incomingActivity = Number(data.currentActivity) || 1;
-  if (foundRow > 0) {
-    // لا تسمح لطلب قديم أو رجوع لنشاط سابق أن يمسح الدرجة أو يرجع التقدم للخلف.
-    const oldScore = Number(rows[foundRow - 1][2]) || 0;
-    const oldStatus = String(rows[foundRow - 1][3] || "قيد الحل");
-    const oldActivity = Number(rows[foundRow - 1][4]) || 1;
-    const finalScore = Math.max(oldScore, incomingScore);
-    const finalActivity = Math.max(oldActivity, incomingActivity);
-    const finalStatus = (oldStatus === "مكتمل" || data.status === "مكتمل") ? "مكتمل" : "قيد الحل";
+  const leaderName = String(data.leaderName || '').trim();
+  if (!leaderName) return { success: false, error: 'leaderName is required' };
 
-    sheet.getRange(foundRow, 3).setValue(finalScore);
-    sheet.getRange(foundRow, 4).setValue(finalStatus);
-    sheet.getRange(foundRow, 5).setValue(finalActivity);
-    sheet.getRange(foundRow, 7).setValue(now);
-    if(finalStatus === "مكتمل" && !rows[foundRow - 1][7]) sheet.getRange(foundRow, 8).setValue(now);
-  } else {
-    sheet.appendRow([sessionId, leaderName, incomingScore, data.status || "قيد الحل", incomingActivity, now, now, data.status === "مكتمل" ? now : ""]);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    ensureSheetSetup();
+    // الخادم هو المرجع للجلسة الحالية؛ أي جهاز قديم ينتقل تلقائيًا للجلسة الجديدة.
+    const sessionId = getActiveSessionId();
+    // إذا كان الجهاز ما زال على جلسة سابقة بعد أن بدأت المعلمة جلسة جديدة، لا ننقل نقاطه القديمة.
+    if (data.sessionId &amp;&amp; String(data.sessionId) !== sessionId) {
+      return { success: true, sessionId, resetRequired: true, totalScore: 0, currentActivity: 1, status: 'قيد الحل' };
+    }
+    const incomingScore = Math.max(0, Number(data.totalScore) || 0);
+    const incomingActivity = Math.max(1, Number(data.currentActivity) || 1);
+    const incomingStatus = data.status === 'مكتمل' ? 'مكتمل' : 'قيد الحل';
+    const rows = sheet.getDataRange().getValues();
+
+    let foundRow = -1;
+    for (let i = 1; i &lt; rows.length; i++) {
+      if (String(rows[i][0]) === sessionId &amp;&amp; String(rows[i][1]).trim() === leaderName) {
+        foundRow = i + 1;
+        break;
+      }
+    }
+
+    const now = new Date().toISOString();
+    if (foundRow &gt; 0) {
+      const old = rows[foundRow - 1];
+      const finalScore = Math.max(Number(old[2]) || 0, incomingScore);
+      const finalActivity = Math.max(Number(old[4]) || 1, incomingActivity);
+      const finalStatus = (String(old[3]) === 'مكتمل' || incomingStatus === 'مكتمل') ? 'مكتمل' : 'قيد الحل';
+
+      sheet.getRange(foundRow, 3).setValue(finalScore);
+      sheet.getRange(foundRow, 4).setValue(finalStatus);
+      sheet.getRange(foundRow, 5).setValue(finalActivity);
+      sheet.getRange(foundRow, 7).setValue(now);
+      if (finalStatus === 'مكتمل' &amp;&amp; !old[7]) sheet.getRange(foundRow, 8).setValue(now);
+      return { success: true, sessionId, totalScore: finalScore, currentActivity: finalActivity, status: finalStatus };
+    }
+
+    sheet.appendRow([sessionId, leaderName, incomingScore, incomingStatus, incomingActivity, data.startedAt || now, now, incomingStatus === 'مكتمل' ? now : '']);
+    return { success: true, sessionId, totalScore: incomingScore, currentActivity: incomingActivity, status: incomingStatus };
+  } finally {
+    lock.releaseLock();
   }
-  return {success: true, sessionId: sessionId};
 }
 
-function getLeaderboardData(sessionId) {
-  const sid = sessionId || getActiveSessionId();
+function getLeaderboardData() {
+  ensureSheetSetup();
+  const sid = getActiveSessionId();
   const rows = sheet.getDataRange().getValues();
-  let list = [];
-  for (let i = 1; i < rows.length; i++) {
+  const list = [];
+
+  for (let i = 1; i &lt; rows.length; i++) {
+    if (String(rows[i][0]) !== sid) continue;
     const lastUpdated = new Date(rows[i][6]).getTime();
-    const isFresh = Number.isFinite(lastUpdated) && (Date.now() - lastUpdated <= SESSION_TTL_MS);
-    if (rows[i][0] === sid && isFresh) {
-      list.push({
-        sessionId: rows[i][0],
-        leaderName: rows[i][1],
-        totalScore: Number(rows[i][2]) || 0,
-        status: rows[i][3],
-        currentActivity: Number(rows[i][4]) || 1,
-        startedAt: rows[i][5],
-        lastUpdatedAt: rows[i][6],
-        finishedAt: rows[i][7]
-      });
-    }
+    const isFresh = Number.isFinite(lastUpdated) &amp;&amp; (Date.now() - lastUpdated &lt;= SESSION_TTL_MS);
+    if (!isFresh) continue;
+    list.push({
+      sessionId: String(rows[i][0]), leaderName: String(rows[i][1]), totalScore: Number(rows[i][2]) || 0,
+      status: String(rows[i][3] || 'قيد الحل'), currentActivity: Number(rows[i][4]) || 1,
+      startedAt: rows[i][5], lastUpdatedAt: rows[i][6], finishedAt: rows[i][7]
+    });
   }
-  list.sort((a,b) => b.totalScore - a.totalScore || (a.finishedAt || "9999").localeCompare(b.finishedAt || "9999"));
-  return {success: true, leaderboard: list};
+
+  list.sort((a, b) =&gt; b.totalScore - a.totalScore || String(a.finishedAt || '9999').localeCompare(String(b.finishedAt || '9999')));
+  return { success: true, sessionId: sid, leaderboard: list, ttlHours: 3 };
 }
 
-function sendEmailReport(sessionId) {
-  const email = PropertiesService.getScriptProperties().getProperty("TEACHER_EMAIL");
-  if (!email) return {success: false, error: "Teacher email not set"};
-  
-  const data = getLeaderboardData(sessionId);
-  let html = "&lt;h2&gt;تقرير مركز التحكم الذكي - الثانوية 146&lt;/h2&gt;&lt;table border='1' cellpadding='8' style='border-collapse:collapse;'&gt;&lt;tr&gt;&lt;th&gt;الترتيب&lt;/th&gt;&lt;th&gt;القائدة&lt;/th&gt;&lt;th&gt;النقاط&lt;/th&gt;&lt;th&gt;الحالة&lt;/th&gt;&lt;/tr&gt;";
-  
-  data.leaderboard.forEach((item, idx) => {
-    html += `&lt;tr&gt;&lt;td&gt;${idx+1}&lt;/td&gt;&lt;td&gt;${item.leaderName}&lt;/td&gt;&lt;td&gt;${item.totalScore}&lt;/td&gt;&lt;td&gt;${item.status}&lt;/td&gt;&lt;/tr&gt;`;
-  });
-  html += "&lt;/table&gt;";
-  
-  GmailApp.sendEmail(email, "تقرير نتائج حصة التقنية الرقمية - مركز التحكم 146", "", {htmlBody: html});
-  return {success: true};
+function sendEmailReport() {
+  const email = PropertiesService.getScriptProperties().getProperty('TEACHER_EMAIL');
+  if (!email) return { success: false, error: 'TEACHER_EMAIL is not set' };
+  const data = getLeaderboardData();
+  let html = "&lt;div dir='rtl' style='font-family:Arial,sans-serif'&gt;&lt;h2&gt;تقرير مركز التحكم الذكي - الثانوية 146&lt;/h2&gt;";
+  html += "&lt;p&gt;نتائج الجلسة الحالية فقط.&lt;/p&gt;&lt;table border='1' cellpadding='8' style='border-collapse:collapse;width:100%'&gt;&lt;tr&gt;&lt;th&gt;الترتيب&lt;/th&gt;&lt;th&gt;القائدة&lt;/th&gt;&lt;th&gt;النقاط&lt;/th&gt;&lt;th&gt;الحالة&lt;/th&gt;&lt;/tr&gt;";
+  data.leaderboard.forEach((item, idx) =&gt; { html += `&lt;tr&gt;&lt;td&gt;${idx + 1}&lt;/td&gt;&lt;td&gt;${escapeHtml(item.leaderName)}&lt;/td&gt;&lt;td&gt;${item.totalScore}&lt;/td&gt;&lt;td&gt;${escapeHtml(item.status)}&lt;/td&gt;&lt;/tr&gt;`; });
+  html += '&lt;/table&gt;&lt;/div&gt;';
+  GmailApp.sendEmail(email, 'تقرير نتائج حصة التقنية الرقمية - مركز التحكم 146', 'يرجى عرض الرسالة بصيغة HTML.', { htmlBody: html });
+  return { success: true, count: data.leaderboard.length, sessionId: data.sessionId };
 }
-            </pre>
+
+function escapeHtml(value) {
+  return String(value || '').replace(/&amp;/g, '&amp;amp;').replace(/&lt;/g, '&amp;lt;').replace(/&gt;/g, '&amp;gt;').replace(/"/g, '&amp;quot;').replace(/'/g, '&amp;#39;');
+}
+</pre>
         </div>
     </div>
 
@@ -422,7 +463,8 @@ function sendEmailReport(sessionId) {
             activeStudent: "cc146_active_student_v2",
             studentStates: "cc146_student_states_v2",
             localLeaderboard: "cc146_local_leaderboard_v2",
-            backendUrl: "cc146_backend_url"
+            backendUrl: "cc146_backend_url",
+            activeSessionId: "cc146_active_session_id_v3"
         };
 
         function getLocalDateKey(date = new Date()) {
@@ -436,7 +478,7 @@ function sendEmailReport(sessionId) {
             const now = new Date().toISOString();
             return {
                 leaderName: "",
-                sessionId: "SES_" + getLocalDateKey(),
+                sessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId) || ("SES_" + getLocalDateKey()),
                 score: 0,
                 currentActivity: 1,
                 maxReachedActivity: 1,
@@ -520,7 +562,10 @@ function sendEmailReport(sessionId) {
             if(!key) return null;
             const states = safeJsonParse(localStorage.getItem(STORAGE_KEYS.studentStates), {});
             const state = states[key];
-            return state && isFreshRecord(state) ? state : null;
+            if(!state || !isFreshRecord(state)) return null;
+            // لا نستعيد تقدم حصة سابقة بعد بدء جلسة جديدة من لوحة المعلمة.
+            if(APP_STATE.sessionId && state.sessionId && state.sessionId !== APP_STATE.sessionId) return null;
+            return state;
         }
 
         function saveLocalState() {
@@ -566,46 +611,80 @@ function sendEmailReport(sessionId) {
         }
 
         // ضعي رابط Google Apps Script هنا مرة واحدة قبل رفع الملف إلى GitHub حتى تعمل لوحة جميع الأجهزة تلقائيًا.
-        const DEFAULT_BACKEND_URL = "";
+        const DEFAULT_BACKEND_URL = "https://script.google.com/macros/s/AKfycbzSaxnJyun3n2m11n06mi8YXLL-iXKtJ238IykOWDApYY9_avidDU64OQOy6SoAFTmJ/exec";
         let BACKEND_URL = localStorage.getItem(STORAGE_KEYS.backendUrl) || DEFAULT_BACKEND_URL;
         let LAST_LEADERBOARD_SOURCE = "local";
         let LAST_BACKEND_ERROR = "";
+
+        async function backendPost(payload) {
+            if (!BACKEND_URL) throw new Error("No backend URL configured");
+            const res = await fetch(BACKEND_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if(!data || data.success === false) throw new Error((data && data.error) || "Backend request failed");
+            return data;
+        }
+
+        async function loadActiveSessionFromBackend() {
+            if(!BACKEND_URL) return APP_STATE.sessionId;
+            const data = await backendPost({ action: "activeSession" });
+            if(data.sessionId) {
+                const changed = APP_STATE.sessionId && APP_STATE.sessionId !== data.sessionId;
+                APP_STATE.sessionId = data.sessionId;
+                localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
+                // عند تغيّر الجلسة لا نسمح بظهور جلسة قديمة كجلسة قابلة للاستكمال.
+                if(changed) updateResumeCard();
+            }
+            return APP_STATE.sessionId;
+        }
 
         async function syncWithBackend() {
             saveLocalState();
             if (!BACKEND_URL || !APP_STATE.leaderName) return;
             try {
-                await fetch(BACKEND_URL, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify({
-                        action: "sync",
-                        sessionId: APP_STATE.sessionId,
-                        leaderName: APP_STATE.leaderName,
-                        totalScore: Number(APP_STATE.score) || 0,
-                        status: APP_STATE.status,
-                        currentActivity: APP_STATE.currentActivity,
-                        startedAt: APP_STATE.startedAt,
-                        lastUpdatedAt: APP_STATE.lastUpdatedAt,
-                        finishedAt: APP_STATE.finishedAt
-                    })
+                const data = await backendPost({
+                    action: "sync",
+                    sessionId: APP_STATE.sessionId,
+                    leaderName: APP_STATE.leaderName,
+                    totalScore: Number(APP_STATE.score) || 0,
+                    status: APP_STATE.status,
+                    currentActivity: APP_STATE.currentActivity,
+                    startedAt: APP_STATE.startedAt,
+                    lastUpdatedAt: APP_STATE.lastUpdatedAt,
+                    finishedAt: APP_STATE.finishedAt
                 });
+                if(data.resetRequired) {
+                    const currentLeader = APP_STATE.leaderName;
+                    applyStoredState(createDefaultState());
+                    APP_STATE.sessionId = data.sessionId;
+                    APP_STATE.leaderName = currentLeader;
+                    localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
+                    updateHeaderFromState();
+                    saveLocalState();
+                    const viewport = document.getElementById('activity-viewport');
+                    if(viewport && !viewport.classList.contains('hidden-screen')) renderActivity(1);
+                    return;
+                }
+                if(data.sessionId && data.sessionId !== APP_STATE.sessionId) {
+                    APP_STATE.sessionId = data.sessionId;
+                    localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
+                    saveLocalState();
+                }
             } catch(e) {
                 console.warn("Backend sync offline fallback active", e);
             }
         }
 
         async function fetchLeaderboardFromBackend() {
-            if (!BACKEND_URL) throw new Error("No backend URL configured");
-            const res = await fetch(BACKEND_URL, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain" },
-                body: JSON.stringify({ action: "leaderboard", sessionId: APP_STATE.sessionId })
-            });
-            const data = await res.json();
-            if (data && data.success) return data.leaderboard || [];
-            throw new Error("Failed to load from server");
+            const data = await backendPost({ action: "leaderboard", sessionId: APP_STATE.sessionId });
+            if(data.sessionId && data.sessionId !== APP_STATE.sessionId) {
+                APP_STATE.sessionId = data.sessionId;
+                localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
+            }
+            return data.leaderboard || [];
         }
 
         function mergeLeaderboardRecords(records) {
@@ -744,7 +823,7 @@ function sendEmailReport(sessionId) {
             goToScreen('screen-student-login');
         }
 
-        function startStudentSession() {
+        async function startStudentSession() {
             const input = document.getElementById('leader-name-input');
             const err = document.getElementById('login-error');
             const name = input ? input.value.trim().replace(/\s+/g, ' ') : "";
@@ -753,6 +832,11 @@ function sendEmailReport(sessionId) {
                 return;
             }
             if(err) err.classList.add('hidden');
+
+            // أولاً نتأكد أن الطالبة تدخل الجلسة المشتركة الحالية التي بدأتها المعلمة.
+            if(BACKEND_URL) {
+                try { await loadActiveSessionFromBackend(); } catch(e) { console.warn("تعذر جلب الجلسة الحالية", e); }
+            }
 
             const saved = getSavedStateForLeader(name);
             if(saved) {
@@ -801,7 +885,7 @@ function sendEmailReport(sessionId) {
             if(!card || !text) return;
             pruneExpiredStorage();
             const saved = safeJsonParse(localStorage.getItem(STORAGE_KEYS.activeStudent), null);
-            if(saved && isFreshRecord(saved) && saved.leaderName) {
+            if(saved && isFreshRecord(saved) && saved.leaderName && (!APP_STATE.sessionId || !saved.sessionId || saved.sessionId === APP_STATE.sessionId)) {
                 const score = Number(saved.score) || 0;
                 const act = Number(saved.currentActivity) || 1;
                 text.innerHTML = `المجموعة: <strong class="text-ccGold">${saved.leaderName}</strong> — ⭐ ${score} نقطة — ${saved.status === 'مكتمل' ? 'مكتمل' : `عند النشاط ${act}`}. الحفظ صالح لمدة 3 ساعات من آخر تحديث.`;
@@ -813,9 +897,51 @@ function sendEmailReport(sessionId) {
 
         async function showTeacherDashboard() {
             goToScreen('screen-teacher');
+            if(BACKEND_URL) {
+                try { await loadActiveSessionFromBackend(); } catch(e) { console.warn("تعذر جلب الجلسة الحالية", e); }
+            }
             await refreshTeacherLeaderboard();
             if(window.teacherInterval) clearInterval(window.teacherInterval);
             window.teacherInterval = setInterval(refreshTeacherLeaderboard, 7000);
+        }
+
+        async function startNewTeacherSession() {
+            if(!BACKEND_URL) {
+                alert("⚠️ لبدء جلسة مشتركة جديدة يجب ربط Google Apps Script أولاً من إعدادات Backend.");
+                return;
+            }
+            const ok = confirm("بدء جلسة جديدة؟\n\nسيتم حذف نتائج الجلسة السابقة من لوحة النتائج وبدء الحصة من الصفر لجميع المجموعات. لا يمكن التراجع عن هذا الإجراء.");
+            if(!ok) return;
+
+            const banner = document.getElementById('teacher-status-banner');
+            try {
+                if(banner) {
+                    banner.className = "mb-4 p-4 rounded-xl border border-ccWarning bg-[rgba(255,165,2,0.1)] text-ccWarning text-center txt-body";
+                    banner.textContent = "⏳ جارٍ إنشاء جلسة جديدة وحذف نتائج الجلسة السابقة...";
+                    banner.classList.remove('hidden');
+                }
+                const data = await backendPost({ action: "newSession" });
+                APP_STATE.sessionId = data.sessionId;
+                localStorage.setItem(STORAGE_KEYS.activeSessionId, data.sessionId);
+                localStorage.removeItem(STORAGE_KEYS.activeStudent);
+                localStorage.removeItem(STORAGE_KEYS.studentStates);
+                localStorage.removeItem(STORAGE_KEYS.localLeaderboard);
+                applyStoredState(createDefaultState());
+                APP_STATE.sessionId = data.sessionId;
+                updateResumeCard();
+                if(banner) {
+                    banner.className = "mb-4 p-4 rounded-xl border border-ccGreen bg-[rgba(0,210,106,0.1)] text-ccGreen text-center txt-body";
+                    banner.innerHTML = `✅ بدأت جلسة جديدة بنجاح. <span class="text-ccTextMain">كل مجموعة تدخل الآن ستظهر في هذه اللوحة.</span>`;
+                    banner.classList.remove('hidden');
+                }
+                await refreshTeacherLeaderboard();
+            } catch(e) {
+                if(banner) {
+                    banner.className = "mb-4 p-4 rounded-xl border border-ccRed bg-[rgba(255,71,87,0.1)] text-ccRed text-center txt-body";
+                    banner.textContent = "❌ تعذر بدء جلسة جديدة: " + (e.message || e);
+                    banner.classList.remove('hidden');
+                }
+            }
         }
 
         async function refreshTeacherLeaderboard() {
@@ -880,12 +1006,7 @@ function sendEmailReport(sessionId) {
                 return;
             }
             try {
-                const res = await fetch(BACKEND_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify({ action: "email", sessionId: APP_STATE.sessionId })
-                });
-                const data = await res.json();
+                const data = await backendPost({ action: "email", sessionId: APP_STATE.sessionId });
                 if(data && data.success) {
                     alert("✅ تم إرسال تقرير النتائج إلى بريدك الإلكتروني بنجاح.");
                 } else {
@@ -2664,12 +2785,15 @@ function sendEmailReport(sessionId) {
             toggleDevGuide();
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
             pruneExpiredStorage();
-            updateResumeCard();
             updateHeaderFromState();
             const inp = document.getElementById('backend-url-input');
             if(inp && BACKEND_URL) inp.value = BACKEND_URL;
+            if(BACKEND_URL) {
+                try { await loadActiveSessionFromBackend(); } catch(e) { console.warn("تعذر جلب الجلسة المشتركة عند الفتح", e); }
+            }
+            updateResumeCard();
         });
 
         window.addEventListener('beforeunload', () => saveLocalState());

@@ -133,6 +133,9 @@
                 <button type="button" onclick="goToPrevActivity()" id="prev-btn" class="btn-outline py-2 px-4 text-sm hidden">
                     <i class="fa-solid fa-arrow-right ml-2"></i> النشاط السابق
                 </button>
+                <button type="button" onclick="goToReviewedNextActivity()" id="review-next-btn" class="btn-outline py-2 px-4 text-sm hidden border-ccBlue text-ccBlue">
+                    النشاط التالي <i class="fa-solid fa-arrow-left mr-2"></i>
+                </button>
                 <span class="text-ccGold font-bold txt-sm tracking-wider uppercase" dir="ltr">CC-146</span>
                 <span id="header-leader-name" class="txt-sm text-ccTextMain bg-ccCard px-4 py-2 rounded-lg border border-ccBorder">المجموعة: -</span>
             </div>
@@ -179,6 +182,16 @@
                     <i class="fa-solid fa-chalkboard-user text-2xl"></i> دخول معلمة
                 </button>
             </div>
+
+            <div id="resume-session-card" class="hidden mt-6 w-full max-w-3xl p-5 rounded-2xl border border-ccGreen bg-[rgba(0,210,106,0.08)] text-right">
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <div class="txt-sm text-ccGreen font-bold"><i class="fa-solid fa-clock-rotate-left ml-2"></i> توجد جلسة محفوظة على هذا الجهاز</div>
+                        <div id="resume-session-text" class="txt-sm text-ccTextMain mt-1"></div>
+                    </div>
+                    <button type="button" onclick="resumeLastSession()" class="btn-huge btn-outline border-ccGreen text-ccGreen py-2 px-6 whitespace-nowrap">متابعة الجلسة</button>
+                </div>
+            </div>
         </section>
 
         <!-- SCREEN 2: STUDENT LOGIN -->
@@ -190,6 +203,7 @@
                     <label class="txt-q text-ccTextMain block mb-3">اسم قائدة المجموعة (يمثل المجموعة كاملة):</label>
                     <input type="text" id="leader-name-input" class="input-lg text-center" placeholder="مثال: نورة..." autocomplete="off">
                     <div id="login-error" class="text-ccRed txt-sm mt-2 hidden font-bold">⚠️ اكتبي اسم قائدة المجموعة أولاً.</div>
+                    <div class="txt-sm text-ccTextMuted mt-3"><i class="fa-solid fa-floppy-disk ml-1 text-ccBlue"></i> إذا دخلتِ بالاسم نفسه خلال 3 ساعات فسيتم استعادة النقاط والتقدم تلقائيًا.</div>
                 </div>
                 <button type="button" onclick="startStudentSession()" class="btn-huge btn-action w-full mt-2 shadow-xl">
                     دخول مركز التحكم <i class="fa-solid fa-power-off mr-2"></i>
@@ -259,7 +273,8 @@
                 <li>ألصق كود الـ Backend المرفق أدناه في محرر Apps Script.</li>
                 <li>أضف في <strong class="text-white">Project Settings > Script Properties</strong> خاصية باسم <code class="text-ccBlue">TEACHER_EMAIL</code> وضع بريدك الإلكتروني.</li>
                 <li>انقر فوق <strong class="text-white">Deploy > New Deployment</strong> واختر نوع <strong class="text-white">Web App</strong> (Execute as: Me, Who has access: Anyone).</li>
-                <li>انسخ الرابط الناتج (Web App URL) وضعه في متغير <code class="text-ccBlue">BACKEND_URL</code> في الكود أدناه.</li>
+                <li>انسخ الرابط الناتج (Web App URL). للأجهزة المتعددة الأفضل وضعه مرة واحدة داخل المتغير <code class="text-ccBlue">DEFAULT_BACKEND_URL</code> قبل رفع الملف إلى GitHub؛ وبذلك تستخدمه جميع أجهزة الطالبات تلقائيًا.</li>
+                <li>يحفظ التطبيق تقدم كل مجموعة محليًا لمدة <strong class="text-white">3 ساعات من آخر تحديث</strong>، ويعرض في لوحة الحصة السجلات الحديثة فقط.</li>
             </ol>
             <div class="bg-ccBg p-4 rounded-xl border border-ccBorder mb-6">
                 <label class="block text-ccGold txt-sm mb-2 font-bold">ضع رابط الـ Web App هنا:</label>
@@ -272,6 +287,24 @@
             <pre class="bg-ccBg p-4 rounded-xl border border-ccBorder text-xs text-ccTextMain overflow-x-auto font-mono text-left" dir="ltr">
 const ss = SpreadsheetApp.getActiveSpreadsheet();
 const sheet = ss.getSheetByName("Leaderboard") || ss.insertSheet("Leaderboard");
+const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // تعرض لوحة الحصة السجلات النشطة خلال آخر 3 ساعات فقط
+const HEADERS = ["sessionId","leaderName","totalScore","status","currentActivity","startedAt","lastUpdatedAt","finishedAt"];
+
+function ensureSheetSetup() {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(HEADERS);
+    sheet.setFrozenRows(1);
+    return;
+  }
+  const first = String(sheet.getRange(1,1).getValue() || "");
+  if (first !== "sessionId") {
+    sheet.insertRowBefore(1);
+    sheet.getRange(1,1,1,HEADERS.length).setValues([HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+}
+
+ensureSheetSetup();
 
 function doPost(e) {
   try {
@@ -314,15 +347,24 @@ function syncRecord(data) {
   }
   
   const now = new Date().toISOString();
-  const score = Number(data.totalScore) || 0;
+  const incomingScore = Number(data.totalScore) || 0;
+  const incomingActivity = Number(data.currentActivity) || 1;
   if (foundRow > 0) {
-    sheet.getRange(foundRow, 3).setValue(score);
-    sheet.getRange(foundRow, 4).setValue(data.status);
-    sheet.getRange(foundRow, 5).setValue(data.currentActivity);
+    // لا تسمح لطلب قديم أو رجوع لنشاط سابق أن يمسح الدرجة أو يرجع التقدم للخلف.
+    const oldScore = Number(rows[foundRow - 1][2]) || 0;
+    const oldStatus = String(rows[foundRow - 1][3] || "قيد الحل");
+    const oldActivity = Number(rows[foundRow - 1][4]) || 1;
+    const finalScore = Math.max(oldScore, incomingScore);
+    const finalActivity = Math.max(oldActivity, incomingActivity);
+    const finalStatus = (oldStatus === "مكتمل" || data.status === "مكتمل") ? "مكتمل" : "قيد الحل";
+
+    sheet.getRange(foundRow, 3).setValue(finalScore);
+    sheet.getRange(foundRow, 4).setValue(finalStatus);
+    sheet.getRange(foundRow, 5).setValue(finalActivity);
     sheet.getRange(foundRow, 7).setValue(now);
-    if(data.status === "مكتمل") sheet.getRange(foundRow, 8).setValue(now);
+    if(finalStatus === "مكتمل" && !rows[foundRow - 1][7]) sheet.getRange(foundRow, 8).setValue(now);
   } else {
-    sheet.appendRow([sessionId, leaderName, score, data.status, data.currentActivity, now, now, ""]);
+    sheet.appendRow([sessionId, leaderName, incomingScore, data.status || "قيد الحل", incomingActivity, now, now, data.status === "مكتمل" ? now : ""]);
   }
   return {success: true, sessionId: sessionId};
 }
@@ -332,7 +374,9 @@ function getLeaderboardData(sessionId) {
   const rows = sheet.getDataRange().getValues();
   let list = [];
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === sid) {
+    const lastUpdated = new Date(rows[i][6]).getTime();
+    const isFresh = Number.isFinite(lastUpdated) && (Date.now() - lastUpdated <= SESSION_TTL_MS);
+    if (rows[i][0] === sid && isFresh) {
       list.push({
         sessionId: rows[i][0],
         leaderName: rows[i][1],
@@ -373,53 +417,170 @@ function sendEmailReport(sessionId) {
         /* -------------------------------------------------------------------------- */
         /*                          CENTRAL STATE & BACKEND                           */
         /* -------------------------------------------------------------------------- */
-        const APP_STATE = {
-            leaderName: "",
-            sessionId: "SES_" + new Date().toISOString().split('T')[0],
-            score: 0,
-            currentActivity: 1,
-            status: "قيد الحل",
-            startedAt: new Date().toISOString(),
-            lastUpdatedAt: new Date().toISOString(),
-            finishedAt: "",
-            activity14Design: {},
-            history: {}, 
-            timerSeconds: 60,
-            timerInterval: null,
-            isExtraTime: false,
-            extraSeconds: 0
+        const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3 ساعات: مدة حفظ تقدم الحصة
+        const STORAGE_KEYS = {
+            activeStudent: "cc146_active_student_v2",
+            studentStates: "cc146_student_states_v2",
+            localLeaderboard: "cc146_local_leaderboard_v2",
+            backendUrl: "cc146_backend_url"
         };
 
-        let BACKEND_URL = localStorage.getItem("cc146_backend_url") || "";
+        function getLocalDateKey(date = new Date()) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function createDefaultState() {
+            const now = new Date().toISOString();
+            return {
+                leaderName: "",
+                sessionId: "SES_" + getLocalDateKey(),
+                score: 0,
+                currentActivity: 1,
+                maxReachedActivity: 1,
+                status: "قيد الحل",
+                startedAt: now,
+                lastUpdatedAt: now,
+                finishedAt: "",
+                activity14Design: {},
+                history: {},
+                timerSeconds: 60,
+                timerInterval: null,
+                isExtraTime: false,
+                extraSeconds: 0,
+                savedAt: "",
+                expiresAt: 0
+            };
+        }
+
+        const APP_STATE = createDefaultState();
+
+        function safeJsonParse(raw, fallback = {}) {
+            try { return raw ? JSON.parse(raw) : fallback; } catch(e) { return fallback; }
+        }
+
+        function normalizeLeaderName(name) {
+            return String(name || "").trim().replace(/\s+/g, ' ').toLowerCase();
+        }
+
+        function getRecordTime(record) {
+            const raw = record && (record.lastUpdatedAt || record.savedAt || record.startedAt);
+            const value = raw ? new Date(raw).getTime() : 0;
+            return Number.isFinite(value) ? value : 0;
+        }
+
+        function isFreshRecord(record) {
+            if(!record) return false;
+            const explicitExpiry = Number(record.expiresAt) || 0;
+            if(explicitExpiry) return explicitExpiry > Date.now();
+            const t = getRecordTime(record);
+            return t > 0 && (Date.now() - t) <= SESSION_TTL_MS;
+        }
+
+        function pruneExpiredStorage() {
+            try {
+                const states = safeJsonParse(localStorage.getItem(STORAGE_KEYS.studentStates), {});
+                Object.keys(states).forEach(k => { if(!isFreshRecord(states[k])) delete states[k]; });
+                localStorage.setItem(STORAGE_KEYS.studentStates, JSON.stringify(states));
+
+                const board = safeJsonParse(localStorage.getItem(STORAGE_KEYS.localLeaderboard), {});
+                Object.keys(board).forEach(k => { if(!isFreshRecord(board[k])) delete board[k]; });
+                localStorage.setItem(STORAGE_KEYS.localLeaderboard, JSON.stringify(board));
+
+                const active = safeJsonParse(localStorage.getItem(STORAGE_KEYS.activeStudent), null);
+                if(active && !isFreshRecord(active)) localStorage.removeItem(STORAGE_KEYS.activeStudent);
+            } catch(e) {
+                console.warn("تعذر تنظيف التخزين المحلي", e);
+            }
+        }
+
+        function serializableState() {
+            return { ...APP_STATE, timerInterval: null };
+        }
+
+        function applyStoredState(saved) {
+            const base = createDefaultState();
+            Object.keys(APP_STATE).forEach(k => delete APP_STATE[k]);
+            Object.assign(APP_STATE, base, saved || {});
+            APP_STATE.score = Number(APP_STATE.score) || 0;
+            APP_STATE.currentActivity = Math.min(15, Math.max(1, Number(APP_STATE.currentActivity) || 1));
+            APP_STATE.maxReachedActivity = Math.min(15, Math.max(APP_STATE.currentActivity, Number(APP_STATE.maxReachedActivity) || APP_STATE.currentActivity));
+            APP_STATE.history = APP_STATE.history && typeof APP_STATE.history === 'object' ? APP_STATE.history : {};
+            APP_STATE.activity14Design = APP_STATE.activity14Design && typeof APP_STATE.activity14Design === 'object' ? APP_STATE.activity14Design : {};
+            APP_STATE.timerInterval = null;
+            APP_STATE.isExtraTime = false;
+            APP_STATE.extraSeconds = 0;
+        }
+
+        function getSavedStateForLeader(name) {
+            pruneExpiredStorage();
+            const key = normalizeLeaderName(name);
+            if(!key) return null;
+            const states = safeJsonParse(localStorage.getItem(STORAGE_KEYS.studentStates), {});
+            const state = states[key];
+            return state && isFreshRecord(state) ? state : null;
+        }
 
         function saveLocalState() {
+            if(!APP_STATE.leaderName) return;
             try {
-                localStorage.setItem("cc146_active_student", JSON.stringify(APP_STATE));
-                let allLocal = JSON.parse(localStorage.getItem("cc146_local_leaderboard") || "{}");
-                allLocal[APP_STATE.leaderName] = { 
+                const now = new Date().toISOString();
+                APP_STATE.lastUpdatedAt = now;
+                APP_STATE.savedAt = now;
+                APP_STATE.expiresAt = Date.now() + SESSION_TTL_MS;
+                const state = serializableState();
+                const key = normalizeLeaderName(APP_STATE.leaderName);
+
+                localStorage.setItem(STORAGE_KEYS.activeStudent, JSON.stringify(state));
+
+                const states = safeJsonParse(localStorage.getItem(STORAGE_KEYS.studentStates), {});
+                states[key] = state;
+                localStorage.setItem(STORAGE_KEYS.studentStates, JSON.stringify(states));
+
+                const allLocal = safeJsonParse(localStorage.getItem(STORAGE_KEYS.localLeaderboard), {});
+                allLocal[key] = {
                     sessionId: APP_STATE.sessionId,
                     leaderName: APP_STATE.leaderName,
                     totalScore: Number(APP_STATE.score) || 0,
                     status: APP_STATE.status,
                     currentActivity: APP_STATE.currentActivity,
                     startedAt: APP_STATE.startedAt,
-                    lastUpdatedAt: APP_STATE.lastUpdatedAt,
-                    finishedAt: APP_STATE.finishedAt
+                    lastUpdatedAt: now,
+                    finishedAt: APP_STATE.finishedAt,
+                    expiresAt: APP_STATE.expiresAt
                 };
-                localStorage.setItem("cc146_local_leaderboard", JSON.stringify(allLocal));
-            } catch(e) {}
+                localStorage.setItem(STORAGE_KEYS.localLeaderboard, JSON.stringify(allLocal));
+                pruneExpiredStorage();
+            } catch(e) {
+                console.warn("تعذر حفظ التقدم محليًا", e);
+            }
         }
+
+        function updateHeaderFromState() {
+            const scoreDisplay = document.getElementById('score-display');
+            if(scoreDisplay) scoreDisplay.innerText = `⭐ ${Number(APP_STATE.score) || 0}`;
+            const nameHeader = document.getElementById('header-leader-name');
+            if(nameHeader) nameHeader.innerText = `المجموعة: ${APP_STATE.leaderName || '-'}`;
+        }
+
+        // ضعي رابط Google Apps Script هنا مرة واحدة قبل رفع الملف إلى GitHub حتى تعمل لوحة جميع الأجهزة تلقائيًا.
+        const DEFAULT_BACKEND_URL = "";
+        let BACKEND_URL = localStorage.getItem(STORAGE_KEYS.backendUrl) || DEFAULT_BACKEND_URL;
+        let LAST_LEADERBOARD_SOURCE = "local";
+        let LAST_BACKEND_ERROR = "";
 
         async function syncWithBackend() {
             saveLocalState();
-            if (!BACKEND_URL) return;
+            if (!BACKEND_URL || !APP_STATE.leaderName) return;
             try {
                 await fetch(BACKEND_URL, {
                     method: "POST",
                     mode: "no-cors",
                     headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify({ 
-                        action: "sync", 
+                    body: JSON.stringify({
+                        action: "sync",
                         sessionId: APP_STATE.sessionId,
                         leaderName: APP_STATE.leaderName,
                         totalScore: Number(APP_STATE.score) || 0,
@@ -431,7 +592,7 @@ function sendEmailReport(sessionId) {
                     })
                 });
             } catch(e) {
-                console.warn("Backend sync offline fallback active");
+                console.warn("Backend sync offline fallback active", e);
             }
         }
 
@@ -443,34 +604,86 @@ function sendEmailReport(sessionId) {
                 body: JSON.stringify({ action: "leaderboard", sessionId: APP_STATE.sessionId })
             });
             const data = await res.json();
-            if (data && data.success) return data.leaderboard;
+            if (data && data.success) return data.leaderboard || [];
             throw new Error("Failed to load from server");
         }
 
-        async function getLeaderboard() {
-            try {
-                if (BACKEND_URL) {
-                    const remoteList = await fetchLeaderboardFromBackend();
-                    if (remoteList && remoteList.length > 0) {
-                        return remoteList.map(item => ({
-                            ...item,
-                            totalScore: Number(item.totalScore) || 0
-                        }));
-                    }
+        function mergeLeaderboardRecords(records) {
+            const map = new Map();
+            for(const raw of records) {
+                if(!raw || !raw.leaderName || !isFreshRecord(raw)) continue;
+                if(raw.sessionId && APP_STATE.sessionId && raw.sessionId !== APP_STATE.sessionId) continue;
+
+                const item = {
+                    ...raw,
+                    totalScore: Number(raw.totalScore) || 0,
+                    currentActivity: Number(raw.currentActivity) || 1
+                };
+                const key = normalizeLeaderName(item.leaderName);
+                const existing = map.get(key);
+                if(!existing) {
+                    map.set(key, item);
+                    continue;
                 }
-            } catch(e) {}
-            
-            try {
-                let allLocal = JSON.parse(localStorage.getItem("cc146_local_leaderboard") || "{}");
-                let list = Object.values(allLocal).map(item => ({
-                    ...item,
-                    totalScore: Number(item.totalScore) || 0
-                }));
-                list.sort((a,b) => b.totalScore - a.totalScore || (a.finishedAt || "9999").localeCompare(b.finishedAt || "9999"));
-                return list;
-            } catch(e) {
-                return [];
+
+                const newer = getRecordTime(item) >= getRecordTime(existing) ? item : existing;
+                const older = newer === item ? existing : item;
+                map.set(key, {
+                    ...older,
+                    ...newer,
+                    totalScore: Math.max(Number(existing.totalScore) || 0, Number(item.totalScore) || 0),
+                    currentActivity: Math.max(Number(existing.currentActivity) || 1, Number(item.currentActivity) || 1),
+                    status: (existing.status === 'مكتمل' || item.status === 'مكتمل') ? 'مكتمل' : (newer.status || 'قيد الحل'),
+                    startedAt: existing.startedAt && item.startedAt
+                        ? (new Date(existing.startedAt) <= new Date(item.startedAt) ? existing.startedAt : item.startedAt)
+                        : (existing.startedAt || item.startedAt || ''),
+                    lastUpdatedAt: getRecordTime(existing) >= getRecordTime(item) ? existing.lastUpdatedAt : item.lastUpdatedAt
+                });
             }
+            return Array.from(map.values()).sort((a,b) =>
+                (Number(b.totalScore) || 0) - (Number(a.totalScore) || 0) ||
+                (a.finishedAt || "9999").localeCompare(b.finishedAt || "9999")
+            );
+        }
+
+        async function getLeaderboard() {
+            pruneExpiredStorage();
+            const combined = [];
+            LAST_BACKEND_ERROR = "";
+            let remoteLoaded = false;
+
+            if(BACKEND_URL) {
+                try {
+                    const remoteList = await fetchLeaderboardFromBackend();
+                    combined.push(...remoteList);
+                    remoteLoaded = true;
+                } catch(e) {
+                    LAST_BACKEND_ERROR = e && e.message ? e.message : "تعذر الاتصال بالخادم";
+                }
+            }
+
+            try {
+                const allLocal = safeJsonParse(localStorage.getItem(STORAGE_KEYS.localLeaderboard), {});
+                combined.push(...Object.values(allLocal));
+            } catch(e) {}
+
+            // أضف الحالة الحالية دائمًا حتى لا تظهر الدرجة 0 بسبب تأخر مزامنة الخادم.
+            if(APP_STATE.leaderName) {
+                combined.push({
+                    sessionId: APP_STATE.sessionId,
+                    leaderName: APP_STATE.leaderName,
+                    totalScore: Number(APP_STATE.score) || 0,
+                    status: APP_STATE.status,
+                    currentActivity: APP_STATE.currentActivity,
+                    startedAt: APP_STATE.startedAt,
+                    lastUpdatedAt: APP_STATE.lastUpdatedAt || new Date().toISOString(),
+                    finishedAt: APP_STATE.finishedAt,
+                    expiresAt: Date.now() + SESSION_TTL_MS
+                });
+            }
+
+            LAST_LEADERBOARD_SOURCE = remoteLoaded ? "remote+local" : "local";
+            return mergeLeaderboardRecords(combined);
         }
 
         /* -------------------------------------------------------------------------- */
@@ -534,21 +747,68 @@ function sendEmailReport(sessionId) {
         function startStudentSession() {
             const input = document.getElementById('leader-name-input');
             const err = document.getElementById('login-error');
-            const name = input ? input.value.trim() : "";
+            const name = input ? input.value.trim().replace(/\s+/g, ' ') : "";
             if (!name) {
                 if(err) err.classList.remove('hidden');
                 return;
             }
+            if(err) err.classList.add('hidden');
+
+            const saved = getSavedStateForLeader(name);
+            if(saved) {
+                applyStoredState(saved);
+                APP_STATE.leaderName = saved.leaderName || name;
+                updateHeaderFromState();
+                saveLocalState();
+
+                if(APP_STATE.status === 'مكتمل') {
+                    finishAllChallenges(true);
+                } else {
+                    renderActivity(APP_STATE.currentActivity || 1);
+                }
+                return;
+            }
+
+            applyStoredState(createDefaultState());
             APP_STATE.leaderName = name;
             APP_STATE.startedAt = new Date().toISOString();
             APP_STATE.currentActivity = 1;
+            APP_STATE.maxReachedActivity = 1;
             APP_STATE.score = 0;
+            APP_STATE.status = "قيد الحل";
+            APP_STATE.history = {};
+            updateHeaderFromState();
             syncWithBackend();
-
-            const nameHeader = document.getElementById('header-leader-name');
-            if(nameHeader) nameHeader.innerText = `المجموعة: ${name}`;
-
             renderActivity(1);
+        }
+
+        function resumeLastSession() {
+            pruneExpiredStorage();
+            const saved = safeJsonParse(localStorage.getItem(STORAGE_KEYS.activeStudent), null);
+            if(!saved || !isFreshRecord(saved) || !saved.leaderName) {
+                updateResumeCard();
+                return;
+            }
+            applyStoredState(saved);
+            updateHeaderFromState();
+            if(APP_STATE.status === 'مكتمل') finishAllChallenges(true);
+            else renderActivity(APP_STATE.currentActivity || 1);
+        }
+
+        function updateResumeCard() {
+            const card = document.getElementById('resume-session-card');
+            const text = document.getElementById('resume-session-text');
+            if(!card || !text) return;
+            pruneExpiredStorage();
+            const saved = safeJsonParse(localStorage.getItem(STORAGE_KEYS.activeStudent), null);
+            if(saved && isFreshRecord(saved) && saved.leaderName) {
+                const score = Number(saved.score) || 0;
+                const act = Number(saved.currentActivity) || 1;
+                text.innerHTML = `المجموعة: <strong class="text-ccGold">${saved.leaderName}</strong> — ⭐ ${score} نقطة — ${saved.status === 'مكتمل' ? 'مكتمل' : `عند النشاط ${act}`}. الحفظ صالح لمدة 3 ساعات من آخر تحديث.`;
+                card.classList.remove('hidden');
+            } else {
+                card.classList.add('hidden');
+            }
         }
 
         async function showTeacherDashboard() {
@@ -567,7 +827,19 @@ function sendEmailReport(sessionId) {
             
             try {
                 const list = await getLeaderboard();
-                if(banner) banner.classList.add('hidden');
+                if(banner) {
+                    if(!BACKEND_URL) {
+                        banner.className = "mb-4 p-4 rounded-xl border border-ccWarning bg-[rgba(255,165,2,0.1)] text-ccWarning text-center txt-sm";
+                        banner.innerHTML = "⚠️ لوحة محلية فقط: ستظهر المجموعات التي استخدمت هذا الجهاز. لعرض جميع الأجهزة اربطي Google Apps Script مرة واحدة من إعدادات Backend.";
+                        banner.classList.remove('hidden');
+                    } else if(LAST_BACKEND_ERROR) {
+                        banner.className = "mb-4 p-4 rounded-xl border border-ccRed bg-[rgba(255,71,87,0.1)] text-ccRed text-center txt-sm";
+                        banner.innerHTML = "⚠️ تعذر الاتصال بالخادم الآن؛ تُعرض أحدث نسخة محفوظة محليًا. <button onclick='refreshTeacherLeaderboard()' class='underline mr-2'>إعادة المحاولة</button>";
+                        banner.classList.remove('hidden');
+                    } else {
+                        banner.classList.add('hidden');
+                    }
+                }
                 tbody.innerHTML = "";
                 
                 if(list.length === 0) {
@@ -666,32 +938,35 @@ function sendEmailReport(sessionId) {
         }
 
         function calculateEarnedPoints(attemptCount, isFirstHalfTime) {
-            let base = 5 - (attemptCount - 1);
+            const safeAttempt = Math.max(1, Number(attemptCount) || 1);
+            let base = 5 - (safeAttempt - 1);
             if(base < 1) base = 1;
-            
+
             let speed = 0;
-            if(!APP_STATE.isExtraTime) {
-                speed = isFirstHalfTime ? 2 : 1;
+            if(!APP_STATE.isExtraTime) speed = isFirstHalfTime ? 2 : 1;
+            return { base, speed, total: base + speed, attempt: safeAttempt };
+        }
+
+        function commitScore(qId, base, speed = 0, meta = {}) {
+            if(APP_STATE.history[qId] && APP_STATE.history[qId].scored) {
+                return { base: 0, speed: 0, total: 0, alreadyScored: true };
             }
-            return { base, speed, total: base + speed };
+            const safeBase = Math.max(0, Number(base) || 0);
+            const safeSpeed = Math.max(0, Number(speed) || 0);
+            const total = safeBase + safeSpeed;
+            APP_STATE.score = (Number(APP_STATE.score) || 0) + total;
+            APP_STATE.history[qId] = { scored: true, base: safeBase, speed: safeSpeed, ...meta };
+            updateHeaderFromState();
+            syncWithBackend();
+            return { base: safeBase, speed: safeSpeed, total };
         }
 
         function awardScore(qId, attemptCount, isFirstHalfTime) {
-            if(APP_STATE.history[qId] && APP_STATE.history[qId].scored) return 0;
-            
-            const pts = calculateEarnedPoints(attemptCount, isFirstHalfTime);
-            APP_STATE.score = (Number(APP_STATE.score) || 0) + pts.total;
-            APP_STATE.history[qId] = { scored: true, base: pts.base, speed: pts.speed };
-            
-            const scoreDisplay = document.getElementById('score-display');
-            if(scoreDisplay) {
-                scoreDisplay.innerText = `⭐ ${APP_STATE.score}`;
-                scoreDisplay.classList.remove('pulse-score');
-                void scoreDisplay.offsetWidth;
-                scoreDisplay.classList.add('pulse-score');
+            if(APP_STATE.history[qId] && APP_STATE.history[qId].scored) {
+                return { base: 0, speed: 0, total: 0, alreadyScored: true };
             }
-            syncWithBackend();
-            return pts;
+            const pts = calculateEarnedPoints(attemptCount, isFirstHalfTime);
+            return commitScore(qId, pts.base, pts.speed, { attempt: pts.attempt });
         }
 
         function showFeedback(containerId, type, message, ptsObj = null) {
@@ -727,16 +1002,21 @@ function sendEmailReport(sessionId) {
         function renderActivity(num) {
             if(num < 1 || num > 15) return;
             APP_STATE.currentActivity = num;
+            APP_STATE.maxReachedActivity = Math.max(Number(APP_STATE.maxReachedActivity) || 1, num);
+            updateHeaderFromState();
             syncWithBackend();
-            
+
             goToScreen('activity-viewport');
             const counter = document.getElementById('activity-counter');
             if(counter) counter.innerText = `النشاط ${num} من 15`;
-            
+
             const prevBtn = document.getElementById('prev-btn');
-            if(prevBtn) {
-                if(num > 1) prevBtn.classList.remove('hidden');
-                else prevBtn.classList.add('hidden');
+            if(prevBtn) prevBtn.classList.toggle('hidden', num <= 1);
+
+            const reviewNextBtn = document.getElementById('review-next-btn');
+            if(reviewNextBtn) {
+                const canMoveForwardWithoutReanswer = num < (Number(APP_STATE.maxReachedActivity) || 1);
+                reviewNextBtn.classList.toggle('hidden', !canMoveForwardWithoutReanswer);
             }
 
             const viewport = document.getElementById('activity-viewport');
@@ -748,7 +1028,15 @@ function sendEmailReport(sessionId) {
 
         function goToPrevActivity() {
             if(APP_STATE.currentActivity > 1) {
+                saveLocalState();
                 renderActivity(APP_STATE.currentActivity - 1);
+            }
+        }
+
+        function goToReviewedNextActivity() {
+            if(APP_STATE.currentActivity < (Number(APP_STATE.maxReachedActivity) || 1)) {
+                saveLocalState();
+                renderActivity(APP_STATE.currentActivity + 1);
             }
         }
 
@@ -767,7 +1055,7 @@ function sendEmailReport(sessionId) {
         // --- ACTIVITY 1: تحدي الرصد ---
         function renderActivity1(container) {
             startTimer(60);
-            if(!APP_STATE.history.act1) APP_STATE.history.act1 = { ideas: [], attempts: 0 };
+            if(!APP_STATE.history.act1) APP_STATE.history.act1 = { ideas: [], attempts: 0, speedBonusAwarded: false };
             
             container.innerHTML = `
                 <div class="glass-card w-full mb-6 slide-up">
@@ -820,10 +1108,20 @@ function sendEmailReport(sessionId) {
                 }
                 history.ideas.push({ text: val, status: 'VALID' });
                 input.value = "";
-                
-                const isFirstHalf = APP_STATE.timerSeconds > 30;
-                let pts = awardScore(qId, 1, isFirstHalf);
-                showFeedback('act1-feedback', 'success', '✅ تم قبول الفكرة بنجاح!', pts);
+
+                // النشاط 1 مختلف: كل فكرة صحيحة غير مكررة = نقطة واحدة فقط.
+                let pts = commitScore(qId, 1, 0, { activity: 1, kind: 'validIdea' });
+
+                // Bonus سرعة واحد فقط للنشاط كله عند الوصول إلى 4 أفكار صحيحة.
+                if(history.ideas.length >= 4 && !history.speedBonusAwarded && !APP_STATE.isExtraTime) {
+                    const bonus = APP_STATE.timerSeconds > 30 ? 2 : 1;
+                    const bonusPts = commitScore('act1_speed_bonus', 0, bonus, { activity: 1, kind: 'speedBonus' });
+                    history.speedBonusAwarded = true;
+                    pts = { base: pts.base, speed: bonusPts.speed, total: pts.total + bonusPts.total };
+                }
+
+                showFeedback('act1-feedback', 'success', '✅ تم قبول الفكرة بنجاح! كل فكرة صحيحة غير مكررة = +1 نقطة.', pts);
+                saveLocalState();
                 renderAct1Ideas();
             } else if(aiResult.status === 'DUPLICATE') {
                 showFeedback('act1-feedback', 'error', '🔁 هذه الفكرة مكررة أو قريبة جدًا من فكرة سابقة.');
@@ -850,7 +1148,13 @@ function sendEmailReport(sessionId) {
         }
 
         function finishAct1() {
+            const h = APP_STATE.history.act1;
+            if(!h || !Array.isArray(h.ideas) || h.ideas.length === 0) {
+                showFeedback('act1-feedback', 'warning', '⚠️ أضيفي فكرة صحيحة واحدة على الأقل قبل الانتقال للنشاط التالي.');
+                return;
+            }
             stopTimer();
+            saveLocalState();
             renderActivity(2);
         }
 
@@ -1772,8 +2076,12 @@ function sendEmailReport(sessionId) {
 
         function checkAct11Stage1(val, btn) {
             const qId = 'act11_s1';
+            const st = APP_STATE.history.act11;
+            st.attempts[qId] = (st.attempts[qId] || 0) + 1;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 60;
             if(val === 'الضغط') {
-                let pts = awardScore(qId, 1, true);
+                let pts = awardScore(qId, attempt, isFirstHalf);
                 showFeedback('act11-s1-fb', 'success', '✅ إجابة صحيحة! مستشعر الضغط يقيس ضغط المياه في الشبكة.', pts);
                 setTimeout(() => advanceAct11Stage(2), 1500);
             } else {
@@ -1783,8 +2091,12 @@ function sendEmailReport(sessionId) {
 
         function checkAct11Stage2(val, btn) {
             const qId = 'act11_s2';
+            const st = APP_STATE.history.act11;
+            st.attempts[qId] = (st.attempts[qId] || 0) + 1;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 60;
             if(val === 'لا') {
-                let pts = awardScore(qId, 1, true);
+                let pts = awardScore(qId, attempt, isFirstHalf);
                 showFeedback('act11-s2-fb', 'success', '✅ صحيح! المستشعر يقيس ويرسل البيانات فقط، ووحدة التحكم تتخذ القرار.', pts);
                 document.getElementById('act11-s2-content').classList.remove('hidden');
             } else {
@@ -1808,8 +2120,12 @@ function sendEmailReport(sessionId) {
 
         function validateAct11Stage3() {
             const qId = 'act11_s3';
+            const st = APP_STATE.history.act11;
+            st.attempts[qId] = (st.attempts[qId] || 0) + 1;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 60;
             if(act11DecVal === 'تشغيل المضخة' && act11ReasVal === 'لأن 1.8 < 3') {
-                let pts = awardScore(qId, 1, true);
+                let pts = awardScore(qId, attempt, isFirstHalf);
                 showFeedback('act11-s3-fb', 'success', '✅ قرار وتفسير صحيحان تماماً!', pts);
                 setTimeout(() => advanceAct11Stage(4), 1800);
             } else {
@@ -1843,8 +2159,12 @@ function sendEmailReport(sessionId) {
 
         function checkAct11Stage5(val, btn) {
             const qId = 'act11_s5';
+            const st = APP_STATE.history.act11;
+            st.attempts[qId] = (st.attempts[qId] || 0) + 1;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 60;
             if(val === 'توقف المضخة') {
-                let pts = awardScore(qId, 1, true);
+                let pts = awardScore(qId, attempt, isFirstHalf);
                 showFeedback('act11-s5-fb', 'success', '✅ صحيح! تم إيقاف المضخة لأن الضغط وصل المطلوب (3 = 3).', pts);
                 setTimeout(() => advanceAct11Stage(6), 1800);
             } else {
@@ -1853,12 +2173,17 @@ function sendEmailReport(sessionId) {
         }
 
         function checkAct11Stage6() {
+            const st = APP_STATE.history.act11;
+            const qId = 'act11_s6';
+            st.attempts[qId] = (st.attempts[qId] || 0) + 1;
+            const attempt = st.attempts[qId];
+            const isFirstHalf = APP_STATE.timerSeconds > 60;
             const q1 = document.getElementById('act11-q6-1').value;
             const q2 = document.getElementById('act11-q6-2').value;
             const q3 = document.getElementById('act11-q6-3').value;
 
             if(q1 === 'correct' && q2 === 'closed' && q3 === 'correct') {
-                let pts = awardScore('act11_s6', 1, true);
+                let pts = awardScore(qId, attempt, isFirstHalf);
                 showFeedback('act11-s6-fb', 'success', '✅ استنتاج نهائي صحيح! هذا نظام تحكم مغلق يعتمد على التغذية الراجعة.', pts);
                 setTimeout(() => goToNextActivity(), 2000);
             } else {
@@ -1868,9 +2193,10 @@ function sendEmailReport(sessionId) {
 
         // --- ACTIVITY 12: هل نثق بكل قراءة؟ ---
         function renderActivity12(container) {
-            startTimer(60);
-            if(!APP_STATE.history.act12) APP_STATE.history.act12 = { stage: 1, attempts: 0 };
+            if(!APP_STATE.history.act12) APP_STATE.history.act12 = { stage: 1, attempts: { anomaly: 0, math: 0 } };
             const st = APP_STATE.history.act12;
+            if(typeof st.attempts === 'number') st.attempts = { anomaly: st.attempts || 0, math: 0 };
+            startTimer(st.stage === 1 ? 60 : 75);
 
             container.innerHTML = `
                 <div class="glass-card w-full mb-6 slide-up">
@@ -1925,11 +2251,12 @@ function sendEmailReport(sessionId) {
 
         function validateAct12Stage1() {
             const st = APP_STATE.history.act12;
-            st.attempts++;
+            st.attempts.anomaly = (st.attempts.anomaly || 0) + 1;
             const qId = 'act12_anomaly';
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
 
             if(selectedAct12SensorVal === 'C') {
-                let pts = awardScore(qId, st.attempts, true);
+                let pts = awardScore(qId, st.attempts.anomaly, isFirstHalf);
                 showFeedback('act12-fb1', 'success', '✅ صحيح! 68°C قراءة شاذة وبعيدة جداً عن القراءات المعتادة.', pts);
                 const fb = document.getElementById('act12-fb1');
                 fb.innerHTML += `<button type="button" onclick="APP_STATE.history.act12.stage=2; renderActivity(12);" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للتحقيق الرياضي <i class="fa-solid fa-arrow-left ml-2"></i></button>`;
@@ -1948,9 +2275,12 @@ function sendEmailReport(sessionId) {
         }
 
         function validateAct12Stage2() {
+            const st = APP_STATE.history.act12;
+            st.attempts.math = (st.attempts.math || 0) + 1;
             const qId = 'act12_math';
+            const isFirstHalf = APP_STATE.timerSeconds > 37;
             if(selectedAct12MathVal === 'الوسيط') {
-                let pts = awardScore(qId, 1, true);
+                let pts = awardScore(qId, st.attempts.math, isFirstHalf);
                 showFeedback('act12-fb2', 'success', '✅ تحليل سليم! الوسيط يمثل الواقع بشكل أفضل لأن القراءة الشاذة رفعت المتوسط بشكل مضلل.', pts);
                 const fb = document.getElementById('act12-fb2');
                 fb.innerHTML += `
@@ -2011,9 +2341,10 @@ function sendEmailReport(sessionId) {
             const st = APP_STATE.history.act13;
             st.attempts++;
             const qId = 'act13_datalost';
+            const isFirstHalf = APP_STATE.timerSeconds > 30;
 
             if(selectedAct13Val === 'check') {
-                let pts = awardScore(qId, st.attempts, true);
+                let pts = awardScore(qId, st.attempts, isFirstHalf);
                 showFeedback('act13-feedback', 'success', '✅ قرار مناسب جداً! لا يمكن اتخاذ قرار موثوق عندما تكون البيانات ناقصة.', pts);
                 const fb = document.getElementById('act13-feedback');
                 fb.innerHTML += `
@@ -2110,16 +2441,14 @@ function sendEmailReport(sessionId) {
             showFeedback('act14-feedback', 'warning', 'جارٍ تقييم جودة وترابط التصميم...');
             const evalRes = await evaluateOpenActivityAI(`${sensor} ${data} ${decision} ${action} ${fb}`, 'design');
             
-            const qualityScore = evalRes.score;
-            const isFirstHalf = APP_STATE.timerSeconds > 90;
-            const speedBonus = isFirstHalf ? 2 : 1;
-            const totalDesignPts = qualityScore + speedBonus;
+            const qualityScore = Math.max(1, Math.min(5, Number(evalRes.score) || 1));
+            const speedBonus = APP_STATE.isExtraTime ? 0 : (APP_STATE.timerSeconds > 90 ? 2 : 1);
 
-            APP_STATE.activity14Design = { prob, sensor, data, decision, action, fb, sys, qualityScore };
-            let pts = awardScore('act14_design', 1, isFirstHalf);
-            APP_STATE.score = (Number(APP_STATE.score) || 0) + (totalDesignPts - pts.total);
+            APP_STATE.activity14Design = { prob, sensor, data, target, decision, action, fb, sys, qualityScore };
+            const pts = commitScore('act14_design', qualityScore, speedBonus, { activity: 14, kind: 'quality' });
+            saveLocalState();
 
-            showFeedback('act14-feedback', 'success', `✅ تم اعتماد التصميم بنجاح! تقييم الجودة: ${qualityScore}/5 وشفافية التغذية الراجعة.`);
+            showFeedback('act14-feedback', 'success', `✅ تم اعتماد التصميم بنجاح! تقييم الجودة: ${qualityScore}/5.`, pts);
             
             const box = document.getElementById('act14-feedback');
             box.innerHTML += `
@@ -2197,10 +2526,11 @@ function sendEmailReport(sessionId) {
 
             showFeedback('act15-feedback', 'warning', 'جارٍ تقييم جودة المراجعة الهندسية...');
             const evalRes = await evaluateOpenActivityAI(`${flaw} ${impr}`, 'review');
-            let reviewPts = evalRes.score;
-            awardScore('act15_review', 1, APP_STATE.timerSeconds > 60);
+            const reviewPts = Math.max(1, Math.min(5, Number(evalRes.score) || 1));
+            const speedBonus = APP_STATE.isExtraTime ? 0 : (APP_STATE.timerSeconds > 60 ? 2 : 1);
+            const pts = commitScore('act15_review', reviewPts, speedBonus, { activity: 15, kind: 'quality' });
 
-            showFeedback('act15-feedback', 'success', `✅ اكتملت مهمة مفتشة النظام بنجاح! تقييم المراجعة: ${reviewPts}/5.`);
+            showFeedback('act15-feedback', 'success', `✅ اكتملت مهمة مفتشة النظام بنجاح! تقييم المراجعة: ${reviewPts}/5.`, pts);
             
             const box = document.getElementById('act15-feedback');
             box.innerHTML += `
@@ -2210,6 +2540,8 @@ function sendEmailReport(sessionId) {
 
         // --- NATIONAL VALUE & REFLECTION SCREEN ---
         function renderNationalValueScreen() {
+            stopTimer();
+            saveLocalState();
             goToScreen('activity-viewport');
             const viewport = document.getElementById('activity-viewport');
             if(!viewport) return;
@@ -2231,11 +2563,19 @@ function sendEmailReport(sessionId) {
         }
 
         // --- END SCREEN: SYSTEM RESTORED ---
-        async function finishAllChallenges() {
-            APP_STATE.status = "مكتمل";
-            APP_STATE.finishedAt = new Date().toISOString();
-            await syncWithBackend();
+        async function finishAllChallenges(refreshOnly = false) {
+            stopTimer();
+            if(!refreshOnly && APP_STATE.status !== "مكتمل") {
+                APP_STATE.status = "مكتمل";
+                APP_STATE.finishedAt = APP_STATE.finishedAt || new Date().toISOString();
+                APP_STATE.currentActivity = 15;
+                APP_STATE.maxReachedActivity = 15;
+                await syncWithBackend();
+            } else {
+                saveLocalState();
+            }
 
+            updateHeaderFromState();
             goToScreen('activity-viewport');
             const viewport = document.getElementById('activity-viewport');
             if(!viewport) return;
@@ -2276,7 +2616,7 @@ function sendEmailReport(sessionId) {
                     <div class="border-t border-ccBorder pt-8 mb-8 text-right">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="txt-title text-ccGold">🏆 لوحة إنجاز المجموعات</h3>
-                            <button type="button" onclick="finishAllChallenges()" class="btn-outline py-2 px-4 text-sm"><i class="fa-solid fa-rotate ml-2"></i> تحديث لوحة النقاط</button>
+                            <button type="button" onclick="finishAllChallenges(true)" class="btn-outline py-2 px-4 text-sm"><i class="fa-solid fa-rotate ml-2"></i> تحديث لوحة النقاط</button>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-right border-collapse">
@@ -2319,14 +2659,31 @@ function sendEmailReport(sessionId) {
             if(!inp) return;
             const val = inp.value.trim();
             BACKEND_URL = val;
-            localStorage.setItem("cc146_backend_url", val);
-            alert("✅ تم حفظ رابط BACKEND_URL بنجاح.");
+            localStorage.setItem(STORAGE_KEYS.backendUrl, val);
+            alert("✅ تم حفظ رابط Backend على هذا الجهاز. للنشر على كل أجهزة الطالبات ضعي الرابط أيضًا في DEFAULT_BACKEND_URL داخل ملف index.html قبل رفعه إلى GitHub.");
             toggleDevGuide();
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            pruneExpiredStorage();
+            updateResumeCard();
+            updateHeaderFromState();
             const inp = document.getElementById('backend-url-input');
             if(inp && BACKEND_URL) inp.value = BACKEND_URL;
+        });
+
+        window.addEventListener('beforeunload', () => saveLocalState());
+        document.addEventListener('visibilitychange', () => {
+            if(document.visibilityState === 'hidden') saveLocalState();
+        });
+
+        // إذا كانت لوحة المعلمة مفتوحة في تبويب آخر على الجهاز نفسه، حدّثها عند تغيّر التخزين.
+        window.addEventListener('storage', (event) => {
+            if(event.key === STORAGE_KEYS.localLeaderboard || event.key === STORAGE_KEYS.activeStudent) {
+                const teacher = document.getElementById('screen-teacher');
+                if(teacher && !teacher.classList.contains('hidden-screen')) refreshTeacherLeaderboard();
+                updateResumeCard();
+            }
         });
     </script>
 </body>

@@ -122,6 +122,12 @@
 
         .hidden-screen { display: none !important; }
         .custom-scroll { overflow-y: auto; max-height: 70vh; }
+    
+        .teacher-table-scroll {overflow:auto; max-height:62vh; width:100%; overscroll-behavior:contain;}
+        .teacher-table-scroll table { min-width: 940px; }
+        .section-card {border:2px solid #1a3256;background:#0e1f3a;border-radius:1rem;padding:1.2rem;text-align:right;}
+        .section-card:hover {border-color:#00a8ff;}
+        .section-card button {width:100%;}
     </style>
 </head>
 <body class="flex flex-col h-screen select-none">
@@ -130,6 +136,7 @@
     <header id="top-bar" class="hidden-screen flex-shrink-0 border-b border-ccBorder bg-ccBg px-8 py-4 z-50 sticky top-0 shadow-lg">
         <div class="max-w-[1900px] mx-auto flex justify-between items-center">
             <div class="flex items-center gap-6">
+                <button type="button" onclick="showSectionChooser()" class="btn-outline py-2 px-4 text-sm">الأقسام</button>
                 <button type="button" onclick="goToPrevActivity()" id="prev-btn" class="btn-outline py-2 px-4 text-sm hidden">
                     <i class="fa-solid fa-arrow-right ml-2"></i> النشاط السابق
                 </button>
@@ -178,7 +185,7 @@
                 <button type="button" onclick="showStudentLogin()" class="btn-huge btn-action flex-1 shadow-lg">
                     <i class="fa-solid fa-users text-2xl"></i> دخول مجموعة
                 </button>
-                <button type="button" onclick="showTeacherDashboard()" class="btn-huge btn-outline flex-1 shadow-lg">
+                <button type="button" onclick="promptTeacherPin()" class="btn-huge btn-outline flex-1 shadow-lg">
                     <i class="fa-solid fa-chalkboard-user text-2xl"></i> دخول معلمة
                 </button>
             </div>
@@ -214,6 +221,20 @@
             </div>
         </section>
 
+        <!-- SECTION SELECTOR -->
+        <section id="screen-sections" class="hidden-screen w-full max-w-6xl mx-auto">
+            <div class="glass-card mb-6">
+                <h2 class="txt-title text-ccGold">🧭 اختاري قسم الدرس</h2>
+                <p id="section-welcome" class="txt-body text-ccTextMuted">يمكن إكمال أقسام الدرس في حصص مختلفة، مع الحفاظ على التقدم والنقاط.</p>
+                <div class="flex gap-3 flex-wrap mt-4">
+                    <button type="button" class="btn-huge btn-outline" onclick="showSectionLeaderboard()">🏆 لوحة المجموعات</button>
+                    <button type="button" class="btn-huge btn-outline" onclick="goToScreen('screen-home')">الرئيسية</button>
+                </div>
+            </div>
+            <div id="section-leaderboard" class="hidden glass-card mb-6"></div>
+            <div id="section-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
         <!-- SCREEN 3: TEACHER DASHBOARD -->
         <section id="screen-teacher" class="hidden-screen w-full max-w-6xl mx-auto flex flex-col min-h-[80vh]">
             <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-ccBorder pb-6">
@@ -231,13 +252,14 @@
             <div id="teacher-status-banner" class="hidden mb-4 p-4 rounded-xl border text-center txt-body"></div>
             <div class="text-center text-ccTextMuted text-xs mb-3">التحديث يدوي — اضغطي زر «تحديث النتائج» عندما تريدين جلب أحدث الدرجات.</div>
 
-            <div class="glass-card flex-grow custom-scroll p-0 overflow-hidden">
+            <div class="glass-card flex-grow teacher-table-scroll p-0">
                 <table class="w-full text-right border-collapse">
                     <thead class="bg-ccBg border-b border-ccBorder text-ccTextMuted txt-body sticky top-0">
                         <tr>
                             <th class="py-4 px-6 font-bold">الترتيب</th>
                             <th class="py-4 px-6 font-bold">اسم القائدة</th>
                             <th class="py-4 px-6 font-bold">المجموع الكلي</th>
+                            <th class="py-4 px-6 font-bold">النشاط الحالي</th>
                             <th class="py-4 px-6 font-bold">الحالة</th>
                         </tr>
                     </thead>
@@ -523,6 +545,8 @@ function escapeHtml(value) {
                 score: 0,
                 currentActivity: 1,
                 maxReachedActivity: 1,
+                activeSectionId: null,
+                completedSections: {},
                 status: "قيد الحل",
                 startedAt: now,
                 lastUpdatedAt: now,
@@ -919,7 +943,7 @@ function escapeHtml(value) {
                 target.classList.add('slide-up');
             }
             const topBar = document.getElementById('top-bar');
-            if (screenId === 'screen-home' || screenId === 'screen-student-login' || screenId === 'screen-teacher' || screenId === 'screen-end') {
+            if (screenId === 'screen-home' || screenId === 'screen-student-login' || screenId === 'screen-sections' || screenId === 'screen-teacher' || screenId === 'screen-end') {
                 if(topBar) topBar.classList.add('hidden-screen');
                 stopTimer();
             } else {
@@ -953,11 +977,7 @@ function escapeHtml(value) {
                 updateHeaderFromState();
                 saveLocalState();
 
-                if(APP_STATE.status === 'مكتمل') {
-                    finishAllChallenges(true);
-                } else {
-                    renderActivity(APP_STATE.currentActivity || 1);
-                }
+                showSectionChooser();
                 return;
             }
 
@@ -971,7 +991,7 @@ function escapeHtml(value) {
             APP_STATE.history = {};
             updateHeaderFromState();
             syncWithBackend();
-            renderActivity(1);
+            showSectionChooser();
         }
 
         function resumeLastSession() {
@@ -983,8 +1003,7 @@ function escapeHtml(value) {
             }
             applyStoredState(saved);
             updateHeaderFromState();
-            if(APP_STATE.status === 'مكتمل') finishAllChallenges(true);
-            else renderActivity(APP_STATE.currentActivity || 1);
+            showSectionChooser();
         }
 
         function updateResumeCard() {
@@ -1014,7 +1033,7 @@ function escapeHtml(value) {
             const banner = document.getElementById('teacher-status-banner');
 
             if(tbody) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-ccTextMuted font-bold">اضغطي «تحديث النتائج» لعرض أحدث النتائج.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-ccTextMuted font-bold">اضغطي «تحديث النتائج» لعرض أحدث النتائج.</td></tr>`;
             }
             if(banner) banner.classList.add('hidden');
         }
@@ -1085,7 +1104,7 @@ function escapeHtml(value) {
             const banner = document.getElementById('teacher-status-banner');
             if(!tbody) return;
             
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-ccTextMuted"><i class="fa-solid fa-spinner fa-spin ml-2"></i> جارٍ تحديث النتائج...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-ccTextMuted"><i class="fa-solid fa-spinner fa-spin ml-2"></i> جارٍ تحديث النتائج...</td></tr>`;
             
             try {
                 const list = await getLeaderboard();
@@ -1105,7 +1124,7 @@ function escapeHtml(value) {
                 tbody.innerHTML = "";
                 
                 if(list.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 txt-title text-ccTextMuted">بانتظار دخول المجموعات في الحصة...</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 txt-title text-ccTextMuted">بانتظار دخول المجموعات في الحصة...</td></tr>`;
                     return;
                 }
                 
@@ -1122,6 +1141,7 @@ function escapeHtml(value) {
                             <td class="py-4 px-6"><span class="px-3 py-1 rounded-lg border font-bold ${badgeClass}">${idx + 1}</span></td>
                             <td class="py-4 px-6 font-bold txt-body">${item.leaderName}</td>
                             <td class="py-4 px-6 font-mono text-ccBlue txt-body font-bold">⭐ ${scoreVal} نقطة</td>
+                            <td class="py-4 px-6 txt-sm text-ccGold">النشاط ${Number(item.currentActivity) || 1} من 15</td>
                             <td class="py-4 px-6 font-bold ${statusColor} txt-body">${item.status}</td>
                         </tr>
                     `;
@@ -1132,7 +1152,7 @@ function escapeHtml(value) {
                     banner.innerHTML = "⚠️ تعذر تحميل النتائج المشتركة من الخادم. <button onclick='refreshTeacherLeaderboard()' class='underline mr-2'>إعادة المحاولة</button>";
                     banner.classList.remove('hidden');
                 }
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-ccRed font-bold">تعذر تحميل لوحة النتائج حاليًا.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-ccRed font-bold">تعذر تحميل لوحة النتائج حاليًا.</td></tr>`;
             }
         }
 
@@ -1234,6 +1254,86 @@ function escapeHtml(value) {
         /* -------------------------------------------------------------------------- */
         /*                          ACTIVITIES ROUTER (1 TO 15)                       */
         /* -------------------------------------------------------------------------- */
+        const SECTIONS = [
+            {id:'monitor',title:'أنظمة المراقبة والتحكم',activities:[1,2,3,4],icon:'📡'},
+            {id:'loops',title:'التحكم المفتوح والمغلق',activities:[5,6,7],icon:'🔄'},
+            {id:'physics',title:'مختبر الفيزياء: ضغط شبكة المياه',activities:[11],icon:'💧'},
+            {id:'design',title:'تحدي التصميم',activities:[14,15],icon:'🏫'},
+            {id:'kahoot',title:'التقويم الختامي – Kahoot',activities:[],icon:'🎯'},
+            {id:'sensors',title:'المستشعرات (إذا تبقى وقت)',activities:[8,9,10,12,13],icon:'🌡️'}
+        ];
+        function currentSection() { return SECTIONS.find(x => x.id === APP_STATE.activeSectionId); }
+        // رمز واجهة فقط، ليس حماية خادم حقيقية. يحتاج تحقق خادمي لتقييد التعديل.
+        function promptTeacherPin() {
+            const answer = prompt('🔒 أدخلي الرقم السري للمعلمة');
+            if(answer === null) return;
+            if(answer !== '2485') { alert('❌ الرقم السري غير صحيح.'); return; }
+            showTeacherDashboard();
+        }
+        function showSectionChooser(showBoard=false) {
+            stopTimer();
+            if(APP_STATE.leaderName) saveLocalState();
+            const grid = document.getElementById('section-grid');
+            if(grid) grid.innerHTML = SECTIONS.map(section => {
+                const done = !!(APP_STATE.completedSections && APP_STATE.completedSections[section.id]);
+                const range = section.activities.length ? section.activities.join('، ') : 'مسابقة خارجية';
+                return `<div class="section-card"><div class="txt-title text-ccGold">${section.icon} ${section.title}</div>
+                    <p class="txt-sm text-ccTextMuted my-3">${section.id === 'sensors' ? 'الأنشطة 8–13 (النشاط 11 متاح بصورة مستقلة في مختبر الفيزياء)' : 'الأنشطة: '+range}</p>
+                    <p class="txt-sm ${done?'text-ccGreen':'text-ccTextMuted'} mb-3">${done?'✅ مكتمل':'يمكن البدء أو الاستكمال'}</p>
+                    <button type="button" class="btn-huge btn-action" onclick="enterSection('${section.id}')">${done?'مراجعة القسم':'دخول القسم'}</button></div>`;
+            }).join('');
+            const welcome = document.getElementById('section-welcome');
+            if(welcome) welcome.textContent = `${APP_STATE.leaderName || 'المجموعة'} — ⭐ ${APP_STATE.score || 0} نقطة. اختاري القسم المناسب للحصة.`;
+            const board = document.getElementById('section-leaderboard');
+            if(board) board.classList.add('hidden');
+            goToScreen('screen-sections');
+            if(showBoard) showSectionLeaderboard();
+        }
+        async function showSectionLeaderboard() {
+            const box = document.getElementById('section-leaderboard');
+            if(!box) return;
+            box.classList.remove('hidden');
+            box.innerHTML = '<p class="txt-sm text-ccTextMuted">جارٍ جلب لوحة المجموعات عند الطلب…</p>';
+            try {
+                const list = await getLeaderboard();
+                box.innerHTML = `<h3 class="txt-title text-ccGold mb-3">🏆 لوحة المجموعات</h3><div style="overflow:auto;max-height:300px;">
+                    <table class="w-full text-right" style="min-width:650px"><thead><tr><th>الترتيب</th><th>القائدة</th><th>النقاط</th><th>النشاط</th></tr></thead>
+                    <tbody>${list.map((r,i)=>`<tr class="border-t border-ccBorder"><td>${i+1}</td><td>${escapeSectionText(r.leaderName)}</td><td>${Number(r.totalScore)||0}</td><td>${Number(r.currentActivity)||1}</td></tr>`).join('') || '<tr><td colspan="4">لا توجد مجموعات بعد</td></tr>'}</tbody></table></div>
+                    <button type="button" class="btn-huge btn-outline mt-4" onclick="showSectionLeaderboard()">تحديث يدوي</button>`;
+            } catch(e) { box.textContent = 'تعذر تحميل لوحة المجموعات الآن؛ يمكن متابعة الأنشطة.'; }
+        }
+        function escapeSectionText(v) { return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function enterSection(id) {
+            const section = SECTIONS.find(x=>x.id===id); if(!section) return;
+            if(id==='kahoot') {
+                window.open('https://kahoot.it/','_blank','noopener,noreferrer');
+                APP_STATE.completedSections = APP_STATE.completedSections || {};
+                saveLocalState(); return;
+            }
+            APP_STATE.activeSectionId=id;
+            saveLocalState();
+            const next = section.activities.find(n => !APP_STATE.history['section_'+id+'_activity_'+n]);
+            renderActivity(next || section.activities[0]);
+        }
+        function markActivityReached(num) {
+            const section=currentSection();
+            if(section) APP_STATE.history['section_'+section.id+'_activity_'+num]=true;
+        }
+        function routeSectionNext() {
+            const section=currentSection();
+            if(!section) return null;
+            const i=section.activities.indexOf(APP_STATE.currentActivity);
+            if(i<0) return null;
+            markActivityReached(APP_STATE.currentActivity);
+            if(i===section.activities.length-1) {
+                APP_STATE.completedSections = APP_STATE.completedSections || {};
+                APP_STATE.completedSections[section.id]=true;
+                saveLocalState();
+                showSectionChooser(true);
+                return true;
+            }
+            return section.activities[i+1];
+        }
         const ACTIVITIES = [
             renderActivity1, renderActivity2, renderActivity3, renderActivity4, renderActivity5,
             renderActivity6, renderActivity7, renderActivity8, renderActivity9, renderActivity10,
@@ -1242,6 +1342,15 @@ function escapeHtml(value) {
 
         function renderActivity(num) {
             if(num < 1 || num > 15) return;
+            const active = currentSection();
+            if(active && active.activities.includes(APP_STATE.currentActivity) && num !== APP_STATE.currentActivity && !active.activities.includes(num)) {
+                // نعيد توجيه الانتقال فقط إلى قائمة الأقسام بدل الانتقال القسري للقسم التالي.
+                // الرجوع اليدوي والمراجعة عن طريق زر الأقسام متاحان دائمًا.
+                const oldIndex = active.activities.indexOf(APP_STATE.currentActivity);
+                if(oldIndex === active.activities.length-1 && num === APP_STATE.currentActivity+1) {
+                    routeSectionNext(); return;
+                }
+            }
             APP_STATE.currentActivity = num;
             APP_STATE.maxReachedActivity = Math.max(Number(APP_STATE.maxReachedActivity) || 1, num);
             updateHeaderFromState();
@@ -1282,6 +1391,9 @@ function escapeHtml(value) {
         }
 
         function goToNextActivity() {
+            const routed=routeSectionNext();
+            if(routed===true) return;
+            if(typeof routed==='number') { renderActivity(routed); return; }
             if(APP_STATE.currentActivity < 15) {
                 renderActivity(APP_STATE.currentActivity + 1);
             } else {
@@ -1614,7 +1726,7 @@ function escapeHtml(value) {
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">21°C &rarr; إيقاف</div>
                         <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">22°C &rarr; إيقاف</div>
-                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">26°C &rarr; تشغيل</div>
+                        <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">23°C &rarr; تشغيل</div>
                         <div class="bg-ccBg p-4 rounded-xl border border-ccBorder text-center txt-body font-mono">28°C &rarr; تشغيل</div>
                     </div>
                     
@@ -1623,7 +1735,7 @@ function escapeHtml(value) {
                         <div class="flex flex-col gap-3">
                             <button type="button" onclick="selectAct4Choice('greater', this)" class="act4-btn btn-huge btn-outline text-right">إذا كانت درجة الحرارة أكبر من 22°C ← تشغيل</button>
                             <button type="button" onclick="selectAct4Choice('less', this)" class="act4-btn btn-huge btn-outline text-right">إذا كانت درجة الحرارة أقل من 22°C ← تشغيل</button>
-                            <button type="button" onclick="selectAct4Choice('equal', this)" class="act4-btn btn-huge btn-outline text-right">إذا كانت تساوي 26°C فقط ← تشغيل</button>
+                            <button type="button" onclick="selectAct4Choice('equal', this)" class="act4-btn btn-huge btn-outline text-right">إذا كانت تساوي 23°C فقط ← تشغيل</button>
                         </div>
                     </div>
                     
@@ -1653,7 +1765,7 @@ function escapeHtml(value) {
 
             if(selectedAct4Val === 'greater') {
                 let pts = awardScore(qId, st.attempts, isFirstHalf);
-                showFeedback('act4-feedback', 'success', '✅ استنتاج صحيح! عندما تتجاوز الحرارة 22°C يبدأ التبريد بالعمل (26 > 22 و 28 > 22).', pts);
+                showFeedback('act4-feedback', 'success', '✅ استنتاج صحيح! عندما تتجاوز الحرارة 22°C يبدأ التبريد بالعمل (23 > 22 و 28 > 22).', pts);
                 const fb = document.getElementById('act4-feedback');
                 fb.innerHTML += `<button type="button" onclick="goToNextActivity()" class="btn-huge btn-action mt-6 mx-auto block">الانتقال للنشاط 5 <i class="fa-solid fa-arrow-left ml-2"></i></button>`;
                 document.getElementById('act4-submit').classList.add('hidden');
@@ -2781,6 +2893,7 @@ function escapeHtml(value) {
 
         // --- NATIONAL VALUE & REFLECTION SCREEN ---
         function renderNationalValueScreen() {
+            if(APP_STATE.activeSectionId === 'design') { routeSectionNext(); return; }
             stopTimer();
             saveLocalState();
             goToScreen('activity-viewport');
